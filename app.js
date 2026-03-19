@@ -1,17 +1,42 @@
-import { db, auth, provider, signInWithPopup, signOut } from './firebase-config.js';
-import { collection, addDoc, query, where, onSnapshot, doc, deleteDoc, updateDoc, getDoc, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+import {
+    db,
+    auth,
+    provider,
+    signInWithPopup,
+    signOut,
+    onAuthStateChanged,
+    setPersistence,
+    browserLocalPersistence
+} from './firebase-config.js';
+
+import {
+    collection,
+    addDoc,
+    query,
+    where,
+    onSnapshot,
+    doc,
+    deleteDoc,
+    updateDoc,
+    getDoc,
+    serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
 // --- CONFIGURAÇÕES ---
-// Aviso de Segurança: Em produção, essa chave deve vir de um backend/serverless.
-const API_KEY_BRAPI = "hshuPrGV3kvLM6Yh8FEDrD";
+// Em produção, mova a chamada da BRAPI para um backend/serverless.
+const API_KEY_BRAPI = 'hshuPrGV3kvLM6Yh8FEDrD';
+const BRAPI_BATCH_SIZE = 20;
 
 let usuarioAtual = null;
 let idEdicaoAtiva = null;
-let filtroAtivo = "Todos";
+let filtroAtivo = 'Todos';
 let isGhostMode = false;
 let chartInstancia = null;
+let ativosCache = [];
+let unsubscribeAtivos = null;
+let unsubscribeProventos = null;
 
-// --- ELEMENTOS DA UI ---
 const elementos = {
     infoUser: document.getElementById('user-info'),
     tabelaCorpo: document.getElementById('tabela-corpo'),
@@ -21,162 +46,256 @@ const elementos = {
     yocMedio: document.getElementById('yoc-medio'),
     quedaPat: document.getElementById('queda-pat'),
     painelAportes: document.getElementById('painel-aportes'),
-    caixaDisp: document.getElementById('caixa-disponivel')
+    caixaDisp: document.getElementById('caixa-disponivel'),
+    secaoDash: document.getElementById('secao-dash'),
+    secaoProventos: document.getElementById('secao-proventos'),
+    chartProventos: document.getElementById('chartProventos'),
+    formTitulo: document.getElementById('form-titulo'),
+    btnRegistrar: document.getElementById('btn-registrar'),
+    btnCancelar: document.getElementById('btn-cancelar'),
+    btnRegistrarProvento: document.getElementById('btn-registrar-provento')
 };
 
-// --- AUTENTICAÇÃO ---
-auth.onAuthStateChanged(user => {
-    if (user) {
-        usuarioAtual = user;
-        elementos.infoUser.innerHTML = `<button id="btn-logout" class="text-[10px] font-black text-red-500 uppercase px-4 py-2 border border-red-500/20 rounded-xl hover:bg-red-500/10 transition">Sair</button>`;
-        document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
-        
+const camposAtivo = {
+    ticker: document.getElementById('ticker-input'),
+    quantidade: document.getElementById('qtd-input'),
+    precoMedio: document.getElementById('pm-input'),
+    nota: document.getElementById('nota-input'),
+    precoTeto: document.getElementById('teto-input'),
+    dataCom: document.getElementById('data-com-input'),
+    dataPg: document.getElementById('data-pg-input'),
+    segmento: document.getElementById('segmento-input')
+};
+
+const camposProvento = {
+    ticker: document.getElementById('prov-ticker'),
+    valor: document.getElementById('prov-valor'),
+    data: document.getElementById('prov-data')
+};
+
+function escapeHtml(valor = '') {
+    return String(valor)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+function formatarMoeda(valor = 0, casas = 2) {
+    return Number(valor || 0).toLocaleString('pt-BR', {
+        minimumFractionDigits: casas,
+        maximumFractionDigits: casas
+    });
+}
+
+function numeroSeguro(valor, fallback = 0) {
+    const numero = Number(valor);
+    return Number.isFinite(numero) ? numero : fallback;
+}
+
+function normalizarTicker(valor) {
+    return String(valor || '')
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g, '');
+}
+
+function diaValido(valor) {
+    if (valor === '' || valor === null || typeof valor === 'undefined') return null;
+    const numero = parseInt(valor, 10);
+    if (!Number.isInteger(numero) || numero < 1 || numero > 31) return null;
+    return numero;
+}
+
+function distanciaCircularDias(diaA, diaB) {
+    const diferenca = Math.abs(diaA - diaB);
+    return Math.min(diferenca, 31 - diferenca);
+}
+
+function atualizarEstadoLogin(logado) {
+    if (logado) {
+        elementos.infoUser.innerHTML = `
+            <button id="btn-logout" type="button" class="text-[10px] font-black text-red-500 uppercase px-4 py-2 border border-red-500/20 rounded-xl hover:bg-red-500/10 transition">
+                Sair
+            </button>`;
+
+        document.getElementById('btn-logout').addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+            } catch (erro) {
+                alert(`Erro ao sair: ${erro.message}`);
+            }
+        });
+
         elementos.tabelaCorpo.innerHTML = '<tr><td colspan="6" class="p-10 text-center text-emerald-500 italic animate-pulse">Carregando cotações e ativos...</td></tr>';
-        
-        carregarDados();
-        carregarProventos();
-    } else {
-        usuarioAtual = null;
-        elementos.infoUser.innerHTML = `<button id="btn-login" class="bg-emerald-600 px-6 py-2 rounded-xl font-black text-[11px] uppercase shadow-lg shadow-emerald-900/20">Login Google</button>`;
-        document.getElementById('btn-login').addEventListener('click', () => signInWithPopup(auth, provider));
-        elementos.tabelaCorpo.innerHTML = '<tr><td colspan="6" class="p-10 text-center text-slate-500 italic">Faça login para carregar seus ativos.</td></tr>';
+        return;
     }
-});
 
-// --- UI E EVENTOS ---
-document.getElementById('btn-ghost').addEventListener('click', () => {
-    isGhostMode = !isGhostMode;
-    document.body.classList.toggle('ghost-mode', isGhostMode);
-    document.getElementById('ghost-icon').innerText = isGhostMode ? '🙈' : '👁️';
-});
+    elementos.infoUser.innerHTML = `
+        <button id="btn-login" type="button" class="bg-emerald-600 px-6 py-2 rounded-xl font-black text-[11px] uppercase shadow-lg shadow-emerald-900/20 hover:bg-emerald-500 transition">
+            Login Google
+        </button>`;
 
-// Delegação de eventos para Filtros
-document.getElementById('container-filtros').addEventListener('click', (e) => {
-    if (e.target.classList.contains('btn-filtro')) {
-        filtroAtivo = e.target.dataset.filtro;
-        document.querySelectorAll('.btn-filtro').forEach(b => {
-            b.classList.toggle('active', b.dataset.filtro === filtroAtivo);
-        });
-        carregarDados(); // Recalcula com os dados já cacheados
-    }
-});
-
-// Delegação de eventos para Abas
-document.getElementById('abas-nav').addEventListener('click', (e) => {
-    if (e.target.tagName === 'BUTTON') {
-        const aba = e.target.dataset.aba;
-        document.getElementById('secao-dash').classList.toggle('hidden', aba !== 'dash');
-        document.getElementById('secao-proventos').classList.toggle('hidden', aba !== 'proventos');
-        
-        document.querySelectorAll('#abas-nav button').forEach(b => {
-            b.classList.toggle('text-white', b.dataset.aba === aba);
-            b.classList.toggle('tab-active', b.dataset.aba === aba);
-        });
-    }
-});
-
-elementos.caixaDisp.addEventListener('input', () => carregarDados());
-
-// --- INTEGRAÇÃO OTIMIZADA DA BRAPI (BATCH FETCH) ---
-async function fetchBrapiBatch(tickersArray) {
-    if (!tickersArray || tickersArray.length === 0) return {};
-    const query = tickersArray.join('%2C'); // Separador por vírgula para a URL
-    try {
-        const res = await fetch(`https://brapi.dev/api/quote/${query}?token=${API_KEY_BRAPI}`);
-        const data = await res.json();
-        const precos = {};
-        if (data.results) {
-            data.results.forEach(ativo => {
-                precos[ativo.symbol] = ativo;
-            });
+    document.getElementById('btn-login').addEventListener('click', async () => {
+        try {
+            await setPersistence(auth, browserLocalPersistence);
+            await signInWithPopup(auth, provider);
+        } catch (erro) {
+            alert(`Erro no login: ${erro.message}`);
         }
-        return precos;
-    } catch (error) {
-        console.error("Erro ao buscar cotações:", error);
-        return {}; // Evita quebrar a aplicação caso a API falhe
+    });
+}
+
+function limparAssinaturas() {
+    if (typeof unsubscribeAtivos === 'function') {
+        unsubscribeAtivos();
+        unsubscribeAtivos = null;
+    }
+
+    if (typeof unsubscribeProventos === 'function') {
+        unsubscribeProventos();
+        unsubscribeProventos = null;
     }
 }
 
-// --- ENGINE DE DADOS ---
-let ativosCache = []; // Cache local para evitar reler o banco ao trocar de filtro
+function resetarDashboard() {
+    ativosCache = [];
+    elementos.totalPatrimonio.textContent = 'R$ 0,00';
+    elementos.rendaMes.textContent = 'R$ 0,00';
+    elementos.rendaHora.textContent = 'R$ 0,00 / hora';
+    elementos.yocMedio.textContent = '0.00%';
+    elementos.quedaPat.textContent = '- R$ 0,00';
+    elementos.painelAportes.innerHTML = '<p class="text-[10px] italic p-4 text-slate-600">Sem dados para rebalanceamento.</p>';
+    elementos.tabelaCorpo.innerHTML = '<tr><td colspan="6" class="p-10 text-center text-slate-500 italic">Faça login para carregar seus ativos.</td></tr>';
 
-window.carregarDados = async () => {
-    if (!usuarioAtual) return;
-    
-    // Se não tiver cache, busca do Firebase
-    if(ativosCache.length === 0) {
-        const q = query(collection(db, "ativos"), where("uid", "==", usuarioAtual.uid));
-        onSnapshot(q, async (snap) => {
-            const ativosRaw = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            
-            // Extrai todos os tickers únicos para uma única chamada de API
-            const tickersUnicos = [...new Set(ativosRaw.map(a => a.ticker))];
-            const dadosMercado = await fetchBrapiBatch(tickersUnicos);
-
-            ativosCache = ativosRaw.map(i => {
-                const api = dadosMercado[i.ticker] || {};
-                const preco = api.regularMarketPrice || 0;
-                const dy = api.dividendYield || 0;
-                const divEstimado = dy > 0 ? (preco * (dy / 100) / 12) : (preco * 0.008);
-                
-                return { 
-                    ...i, 
-                    preco, 
-                    divEstimado,
-                    total: preco * (i.quantidade || 0), 
-                    inv: (i.precoMedio || 0) * (i.quantidade || 0) 
-                };
-            });
-            renderizarTabela();
-        });
-    } else {
-        renderizarTabela();
+    if (chartInstancia) {
+        chartInstancia.destroy();
+        chartInstancia = null;
     }
-};
+}
+
+async function fetchBrapiBatch(tickersArray) {
+    if (!Array.isArray(tickersArray) || tickersArray.length === 0) return {};
+
+    const tickers = [...new Set(tickersArray.map(normalizarTicker).filter(Boolean))];
+    const precos = {};
+
+    for (let indice = 0; indice < tickers.length; indice += BRAPI_BATCH_SIZE) {
+        const lote = tickers.slice(indice, indice + BRAPI_BATCH_SIZE);
+        const simbolos = encodeURIComponent(lote.join(','));
+
+        try {
+            const resposta = await fetch(`https://brapi.dev/api/quote/${simbolos}?token=${API_KEY_BRAPI}`);
+
+            if (!resposta.ok) {
+                throw new Error(`HTTP ${resposta.status}`);
+            }
+
+            const data = await resposta.json();
+            if (Array.isArray(data.results)) {
+                data.results.forEach((ativo) => {
+                    if (ativo?.symbol) {
+                        precos[ativo.symbol] = ativo;
+                    }
+                });
+            }
+        } catch (erro) {
+            console.error('Erro ao buscar cotações na BRAPI:', erro);
+        }
+    }
+
+    return precos;
+}
+
+function enriquecerAtivos(ativosRaw, dadosMercado) {
+    return ativosRaw.map((item) => {
+        const ticker = normalizarTicker(item.ticker);
+        const api = dadosMercado[ticker] || {};
+        const preco = numeroSeguro(api.regularMarketPrice, 0);
+        const dy = numeroSeguro(api.dividendYield, 0);
+        const quantidade = numeroSeguro(item.quantidade, 0);
+        const precoMedio = numeroSeguro(item.precoMedio, 0);
+        const divEstimado = dy > 0 ? (preco * (dy / 100)) / 12 : preco * 0.008;
+
+        return {
+            ...item,
+            ticker,
+            quantidade,
+            precoMedio,
+            nota: numeroSeguro(item.nota, 0),
+            precoTeto: numeroSeguro(item.precoTeto, 0),
+            dataCom: diaValido(item.dataCom),
+            dataPg: diaValido(item.dataPg),
+            segmento: item.segmento || 'Outros',
+            preco,
+            divEstimado,
+            total: preco * quantidade,
+            inv: precoMedio * quantidade
+        };
+    });
+}
 
 function renderizarTabela() {
-    let patTotal = 0; let somaNotas = 0; let custoTotal = 0; let projecaoMes = 0;
-    const caixa = parseFloat(elementos.caixaDisp.value) || 0;
+    const ativosFiltrados = filtroAtivo === 'Todos'
+        ? ativosCache
+        : ativosCache.filter((ativo) => ativo.segmento === filtroAtivo);
+
+    const caixa = numeroSeguro(elementos.caixaDisp.value, 0);
     const diaAtual = new Date().getDate();
 
-    ativosCache.forEach(a => { 
-        patTotal += a.total; 
-        somaNotas += (parseFloat(a.nota) || 0); 
-        custoTotal += a.inv; 
+    let patrimonio = 0;
+    let somaNotas = 0;
+    let custoTotal = 0;
+    let projecaoMes = 0;
+    const sugestoes = [];
+
+    ativosFiltrados.forEach((ativo) => {
+        patrimonio += ativo.total;
+        somaNotas += ativo.nota;
+        custoTotal += ativo.inv;
     });
 
-    const ativosFiltrados = filtroAtivo === "Todos" ? ativosCache : ativosCache.filter(a => a.segmento === filtroAtivo);
-    let html = ''; let sug = [];
+    const linhas = ativosFiltrados.map((ativo) => {
+        const pesoIdeal = somaNotas > 0 ? ativo.nota / somaNotas : 0;
+        const pesoReal = patrimonio > 0 ? ativo.total / patrimonio : 0;
+        const rendimentoAproximado = ativo.quantidade * ativo.divEstimado;
+        const larguraBarra = Math.max(0, Math.min(100, pesoReal * 100));
+        const isDataComPerto = ativo.dataCom ? distanciaCircularDias(ativo.dataCom, diaAtual) <= 3 : false;
 
-    ativosFiltrados.forEach(f => {
-        const pIdeal = somaNotas > 0 ? ((parseFloat(f.nota) || 0) / somaNotas) : 0;
-        const pReal = patTotal > 0 ? (f.total / patTotal) : 0;
-        const rendAprox = (f.quantidade || 0) * f.divEstimado;
-        projecaoMes += rendAprox;
+        projecaoMes += rendimentoAproximado;
 
-        if (pReal < pIdeal && f.preco > 0 && f.preco <= (f.precoTeto || 99999)) {
-            sug.push({ ticker: f.ticker, qtd: Math.floor(((patTotal + caixa) * pIdeal - f.total) / f.preco), nota: f.nota });
+        if (pesoReal < pesoIdeal && ativo.preco > 0 && ativo.preco <= (ativo.precoTeto || Number.POSITIVE_INFINITY)) {
+            const quantidadeSugerida = Math.floor((((patrimonio + caixa) * pesoIdeal) - ativo.total) / ativo.preco);
+
+            if (quantidadeSugerida > 0) {
+                sugestoes.push({
+                    ticker: ativo.ticker,
+                    qtd: quantidadeSugerida,
+                    nota: ativo.nota
+                });
+            }
         }
 
-        const isDataComPerto = f.dataCom && (Math.abs(f.dataCom - diaAtual) <= 3);
-
-        html += `
+        return `
             <tr class="hover:bg-slate-800/40 border-b border-slate-800/50 transition-colors">
                 <td class="p-4">
                     <div class="flex flex-col">
                         <div class="flex items-center gap-2">
-                            <span class="font-black text-emerald-400 text-sm tracking-tighter">${f.ticker}</span>
+                            <span class="font-black text-emerald-400 text-sm tracking-tighter">${escapeHtml(ativo.ticker)}</span>
                             ${isDataComPerto ? '<span class="badge-com">DATA COM</span>' : ''}
                         </div>
-                        <span class="text-[9px] text-slate-500 uppercase font-black">${f.segmento || 'FII / OUTRO'}</span>
+                        <span class="text-[9px] text-slate-500 uppercase font-black">${escapeHtml(ativo.segmento || 'FII / OUTRO')}</span>
                     </div>
                 </td>
                 <td class="p-4 text-center">
                     <div class="flex flex-col">
                         <span class="text-[8px] text-slate-500 font-bold uppercase">Preço / Teto</span>
-                        <span class="font-bold text-white text-xs val-sensivel">${f.preco > 0 ? 'R$ ' + f.preco.toFixed(2) : '<span class="text-red-500 text-[10px]">API OFF</span>'}</span>
-                        <span class="text-[10px] ${(f.preco || 0) > (f.precoTeto || 0) ? 'text-red-500' : 'text-emerald-500'} font-black">
-                            Teto: R$ ${(f.precoTeto || 0).toFixed(2)}
+                        <span class="font-bold text-white text-xs val-sensivel">
+                            ${ativo.preco > 0 ? `R$ ${formatarMoeda(ativo.preco)}` : '<span class="text-red-500 text-[10px]">API OFF</span>'}
+                        </span>
+                        <span class="text-[10px] ${(ativo.preco || 0) > (ativo.precoTeto || 0) ? 'text-red-500' : 'text-emerald-500'} font-black">
+                            Teto: R$ ${formatarMoeda(ativo.precoTeto)}
                         </span>
                     </div>
                 </td>
@@ -186,199 +305,139 @@ function renderizarTabela() {
                         <div class="flex gap-2">
                             <div class="bg-slate-900 px-2 py-1 rounded border border-white/5 min-w-[35px]">
                                 <span class="text-[7px] text-blue-400 font-black block text-center">COM</span>
-                                <span class="text-white text-[10px] font-bold block text-center">${f.dataCom || '--'}</span>
+                                <span class="text-white text-[10px] font-bold block text-center">${ativo.dataCom ?? '--'}</span>
                             </div>
                             <div class="bg-slate-900 px-2 py-1 rounded border border-white/5 min-w-[35px]">
                                 <span class="text-[7px] text-emerald-400 font-black block text-center">PAGO</span>
-                                <span class="text-white text-[10px] font-bold block text-center">${f.dataPg || '--'}</span>
+                                <span class="text-white text-[10px] font-bold block text-center">${ativo.dataPg ?? '--'}</span>
                             </div>
                         </div>
                     </div>
                 </td>
                 <td class="p-4">
                     <div class="w-full min-w-[150px]">
-                        <div class="flex justify-between text-[8px] font-black text-slate-500 mb-1 uppercase">
-                            <span class="text-blue-400">${(pReal*100).toFixed(1)}% Real / ${(pIdeal*100).toFixed(1)}% Alvo</span>
-                            <span class="text-purple-400">R$ ${rendAprox.toFixed(2)} Est.</span>
+                        <div class="flex justify-between text-[8px] font-black text-slate-500 mb-1 uppercase gap-3">
+                            <span class="text-blue-400">${(pesoReal * 100).toFixed(1)}% Real / ${(pesoIdeal * 100).toFixed(1)}% Alvo</span>
+                            <span class="text-purple-400">R$ ${formatarMoeda(rendimentoAproximado)} Est.</span>
                         </div>
                         <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-white/5">
-                            <div class="bg-blue-600 h-full" style="width:${(pReal*100)}%"></div>
+                            <div class="bg-blue-600 h-full" style="width:${larguraBarra}%"></div>
                         </div>
                     </div>
                 </td>
                 <td class="p-4 text-right">
                     <div class="flex flex-col items-end">
-                        <span class="font-black text-white text-sm mono val-sensivel">R$ ${f.total.toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
-                        <span class="text-[9px] text-slate-500 font-bold uppercase">${f.quantidade || 0} COTAS</span>
+                        <span class="font-black text-white text-sm mono val-sensivel">R$ ${formatarMoeda(ativo.total)}</span>
+                        <span class="text-[9px] text-slate-500 font-bold uppercase">${formatarMoeda(ativo.quantidade, 0)} COTAS</span>
                     </div>
                 </td>
                 <td class="p-4 text-center">
                     <div class="flex gap-2 justify-center">
-                        <button data-id="${f.id}" class="btn-editar bg-slate-800 p-2 rounded-lg hover:text-blue-400 transition">📝</button>
-                        <button data-id="${f.id}" class="btn-deletar bg-slate-800 p-2 rounded-lg hover:text-red-500 transition">✕</button>
+                        <button data-id="${escapeHtml(ativo.id)}" type="button" class="btn-editar bg-slate-800 p-2 rounded-lg hover:text-blue-400 transition" aria-label="Editar ${escapeHtml(ativo.ticker)}">📝</button>
+                        <button data-id="${escapeHtml(ativo.id)}" type="button" class="btn-deletar bg-slate-800 p-2 rounded-lg hover:text-red-500 transition" aria-label="Excluir ${escapeHtml(ativo.ticker)}">✕</button>
                     </div>
                 </td>
             </tr>`;
     });
 
-    elementos.tabelaCorpo.innerHTML = html || '<tr><td colspan="6" class="p-10 text-center text-slate-500 italic">Nenhum ativo corresponde aos filtros.</td></tr>';
-    elementos.totalPatrimonio.innerHTML = `R$ ${patTotal.toLocaleString('pt-BR', {minimumFractionDigits:2})}`;
-    elementos.rendaMes.innerHTML = `R$ ${projecaoMes.toLocaleString('pt-BR', {minimumFractionDigits:2})}`;
-    elementos.rendaHora.innerHTML = `R$ ${(projecaoMes/720).toLocaleString('pt-BR', {minimumFractionDigits:4})} / hora`;
-    elementos.yocMedio.innerText = custoTotal > 0 ? `${((projecaoMes*12/custoTotal)*100).toFixed(2)}%` : `0.00%`;
-    elementos.quedaPat.innerHTML = `- R$ ${(patTotal*0.05).toLocaleString('pt-BR', {minimumFractionDigits:2})} (Stress 5%)`;
+    elementos.tabelaCorpo.innerHTML = linhas.join('') || '<tr><td colspan="6" class="p-10 text-center text-slate-500 italic">Nenhum ativo corresponde aos filtros.</td></tr>';
+    elementos.totalPatrimonio.textContent = `R$ ${formatarMoeda(patrimonio)}`;
+    elementos.rendaMes.textContent = `R$ ${formatarMoeda(projecaoMes)}`;
+    elementos.rendaHora.textContent = `R$ ${formatarMoeda(projecaoMes / 720, 4)} / hora`;
+    elementos.yocMedio.textContent = custoTotal > 0 ? `${((projecaoMes * 12 / custoTotal) * 100).toFixed(2)}%` : '0.00%';
+    elementos.quedaPat.textContent = `- R$ ${formatarMoeda(patrimonio * 0.05)} (Stress 5%)`;
 
-    elementos.painelAportes.innerHTML = sug.sort((a,b)=>b.nota-a.nota).slice(0,2).map(s => `
-        <div class="bg-slate-900/60 p-4 rounded-2xl border border-blue-900/30">
-            <div class="text-[8px] text-blue-400 font-black mb-1 uppercase tracking-widest">Rebalancear</div>
-            <div class="text-lg font-black text-white">${s.ticker} <span class="text-emerald-500">+${s.qtd} un.</span></div>
-        </div>
-    `).join('') || '<p class="text-[10px] italic p-4 text-slate-600">Alocação equilibrada.</p>';
+    elementos.painelAportes.innerHTML = sugestoes
+        .sort((a, b) => b.nota - a.nota)
+        .slice(0, 2)
+        .map((sugestao) => `
+            <div class="bg-slate-900/60 p-4 rounded-2xl border border-blue-900/30">
+                <div class="text-[8px] text-blue-400 font-black mb-1 uppercase tracking-widest">Rebalancear</div>
+                <div class="text-lg font-black text-white">${escapeHtml(sugestao.ticker)} <span class="text-emerald-500">+${sugestao.qtd} un.</span></div>
+            </div>
+        `)
+        .join('') || '<p class="text-[10px] italic p-4 text-slate-600">Alocação equilibrada.</p>';
 }
 
-// Eventos da Tabela (Editar / Deletar)
-elementos.tabelaCorpo.addEventListener('click', async (e) => {
-    const btnEditar = e.target.closest('.btn-editar');
-    const btnDeletar = e.target.closest('.btn-deletar');
-
-    if (btnEditar) prepararEdicao(btnEditar.dataset.id);
-    if (btnDeletar) {
-        if (confirm("Deseja realmente excluir este ativo?")) {
-            await deleteDoc(doc(db, "ativos", btnDeletar.dataset.id));
-            ativosCache = []; // Limpa cache para forçar recarregamento
-        }
-    }
-});
-
-// --- OPERAÇÕES CRUD DE ATIVOS ---
-document.getElementById('btn-registrar').addEventListener('click', async () => {
-    if (!usuarioAtual) return alert("Faça login primeiro!");
-    
-    const payload = {
-        uid: usuarioAtual.uid,
-        ticker: document.getElementById('ticker-input').value.toUpperCase(),
-        quantidade: parseFloat(document.getElementById('qtd-input').value) || 0,
-        precoMedio: parseFloat(document.getElementById('pm-input').value) || 0,
-        nota: parseInt(document.getElementById('nota-input').value) || 0,
-        precoTeto: parseFloat(document.getElementById('teto-input').value) || 0,
-        dataCom: parseInt(document.getElementById('data-com-input').value) || null,
-        dataPg: parseInt(document.getElementById('data-pg-input').value) || null,
-        segmento: document.getElementById('segmento-input').value || 'Outros',
-        timestamp: serverTimestamp()
-    };
-
-    try {
-        if (idEdicaoAtiva) {
-            await updateDoc(doc(db, "ativos", idEdicaoAtiva), payload);
-        } else {
-            await addDoc(collection(db, "ativos"), payload);
-        }
-        cancelarEdicao();
-        ativosCache = []; // Limpa cache para atualizar a tela
-    } catch (e) { alert("Erro ao salvar: " + e.message); }
-});
-
-const prepararEdicao = async (id) => {
-    const d = await getDoc(doc(db, "ativos", id));
-    if (d.exists()) {
-        const i = d.data();
-        document.getElementById('ticker-input').value = i.ticker || "";
-        document.getElementById('qtd-input').value = i.quantidade || "";
-        document.getElementById('pm-input').value = i.precoMedio || "";
-        document.getElementById('nota-input').value = i.nota || "";
-        document.getElementById('teto-input').value = i.precoTeto || "";
-        document.getElementById('data-com-input').value = i.dataCom || "";
-        document.getElementById('data-pg-input').value = i.dataPg || "";
-        document.getElementById('segmento-input').value = i.segmento || "Outros";
-        
-        idEdicaoAtiva = id;
-        document.getElementById('btn-registrar').innerText = "Atualizar Ativo";
-        document.getElementById('btn-cancelar').classList.remove('hidden');
-        document.getElementById('form-titulo').innerHTML = `<span class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span> Editando Ativo`;
-    }
-};
-
-const cancelarEdicao = () => {
-    idEdicaoAtiva = null;
-    document.getElementById('btn-registrar').innerText = "Adicionar Ativo";
-    document.getElementById('btn-cancelar').classList.add('hidden');
-    document.getElementById('form-titulo').innerHTML = `<span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Gerenciar Ativo`;
-    
-    ['ticker-input', 'qtd-input', 'pm-input', 'nota-input', 'teto-input', 'data-com-input', 'data-pg-input'].forEach(id => {
-        document.getElementById(id).value = '';
-    });
-};
-
-document.getElementById('btn-cancelar').addEventListener('click', cancelarEdicao);
-
-// --- SISTEMA DE PROVENTOS E CHART.JS ---
-document.getElementById('btn-registrar-provento').addEventListener('click', async () => {
-    if (!usuarioAtual) return alert("Faça login primeiro!");
-    
-    const ticker = document.getElementById('prov-ticker').value.toUpperCase();
-    const valor = parseFloat(document.getElementById('prov-valor').value);
-    const dataRef = document.getElementById('prov-data').value; // Formato YYYY-MM
-
-    if (!ticker || !valor || !dataRef) return alert("Preencha todos os campos corretamente.");
-
-    try {
-        await addDoc(collection(db, "proventos"), {
-            uid: usuarioAtual.uid,
-            ticker,
-            valor,
-            mesAno: dataRef,
-            timestamp: serverTimestamp()
-        });
-        
-        document.getElementById('prov-ticker').value = '';
-        document.getElementById('prov-valor').value = '';
-        alert("Provento registrado com sucesso!");
-    } catch (e) { alert("Erro ao registrar provento: " + e.message); }
-});
-
-function carregarProventos() {
+function assinarAtivos() {
     if (!usuarioAtual) return;
-    
-    const q = query(collection(db, "proventos"), where("uid", "==", usuarioAtual.uid), orderBy("mesAno", "asc"));
-    onSnapshot(q, (snap) => {
-        const dadosAgrupados = {};
-        
-        snap.forEach(doc => {
-            const data = doc.data();
-            if(!dadosAgrupados[data.mesAno]) dadosAgrupados[data.mesAno] = 0;
-            dadosAgrupados[data.mesAno] += data.valor;
+
+    if (typeof unsubscribeAtivos === 'function') {
+        unsubscribeAtivos();
+    }
+
+    const consulta = query(collection(db, 'ativos'), where('uid', '==', usuarioAtual.uid));
+
+    unsubscribeAtivos = onSnapshot(consulta, async (snapshot) => {
+        const ativosRaw = snapshot.docs.map((documento) => ({
+            id: documento.id,
+            ...documento.data()
+        }));
+
+        const tickers = ativosRaw.map((ativo) => ativo.ticker);
+        const dadosMercado = await fetchBrapiBatch(tickers);
+        ativosCache = enriquecerAtivos(ativosRaw, dadosMercado);
+        renderizarTabela();
+    }, (erro) => {
+        console.error('Erro ao escutar ativos:', erro);
+        elementos.tabelaCorpo.innerHTML = '<tr><td colspan="6" class="p-10 text-center text-red-500 italic">Erro ao carregar ativos.</td></tr>';
+    });
+}
+
+function assinarProventos() {
+    if (!usuarioAtual) return;
+
+    if (typeof unsubscribeProventos === 'function') {
+        unsubscribeProventos();
+    }
+
+    const consulta = query(collection(db, 'proventos'), where('uid', '==', usuarioAtual.uid));
+
+    unsubscribeProventos = onSnapshot(consulta, (snapshot) => {
+        const agrupado = {};
+
+        snapshot.forEach((documento) => {
+            const dado = documento.data();
+            if (!dado?.mesAno) return;
+            agrupado[dado.mesAno] = numeroSeguro(agrupado[dado.mesAno], 0) + numeroSeguro(dado.valor, 0);
         });
 
-        const labels = Object.keys(dadosAgrupados).map(d => {
-            const [ano, mes] = d.split('-');
+        const mesesOrdenados = Object.keys(agrupado).sort((a, b) => a.localeCompare(b));
+        const labels = mesesOrdenados.map((mesAno) => {
+            const [ano, mes] = mesAno.split('-');
             return `${mes}/${ano}`;
         });
-        const valores = Object.values(dadosAgrupados);
+        const valores = mesesOrdenados.map((mesAno) => agrupado[mesAno]);
 
         renderizarGrafico(labels, valores);
+    }, (erro) => {
+        console.error('Erro ao escutar proventos:', erro);
     });
 }
 
 function renderizarGrafico(labels, data) {
-    const ctx = document.getElementById('chartProventos');
-    
-    if (chartInstancia) chartInstancia.destroy(); // Reseta o gráfico antigo
-    
-    if(labels.length === 0) {
-        // Fallback caso não tenha dados
-        labels = ['Sem dados']; data = [0];
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js não foi carregado.');
+        return;
     }
+
+    if (chartInstancia) {
+        chartInstancia.destroy();
+    }
+
+    const labelsFinais = labels.length ? labels : ['Sem dados'];
+    const dataFinal = data.length ? data : [0];
 
     Chart.defaults.color = '#64748b';
     Chart.defaults.font.family = "'Inter', sans-serif";
 
-    chartInstancia = new Chart(ctx, {
+    chartInstancia = new Chart(elementos.chartProventos, {
         type: 'bar',
         data: {
-            labels: labels,
+            labels: labelsFinais,
             datasets: [{
                 label: 'Rendimentos Recebidos (R$)',
-                data: data,
+                data: dataFinal,
                 backgroundColor: 'rgba(59, 130, 246, 0.8)',
                 borderColor: '#3b82f6',
                 borderWidth: 1,
@@ -387,16 +446,232 @@ function renderizarGrafico(labels, data) {
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
-                tooltip: { 
-                    callbacks: { label: (ctx) => `R$ ${ctx.raw.toFixed(2)}` }
+                tooltip: {
+                    callbacks: {
+                        label: (contexto) => `R$ ${formatarMoeda(contexto.raw)}`
+                    }
                 }
             },
             scales: {
-                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
-                x: { grid: { display: false } }
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(255,255,255,0.05)' }
+                },
+                x: {
+                    grid: { display: false }
+                }
             }
         }
     });
 }
+
+function validarPayloadAtivo(payload) {
+    if (!payload.ticker) {
+        throw new Error('Informe um ticker válido.');
+    }
+    if (payload.quantidade <= 0) {
+        throw new Error('A quantidade deve ser maior que zero.');
+    }
+    if (payload.precoMedio < 0 || payload.precoTeto < 0) {
+        throw new Error('Preços não podem ser negativos.');
+    }
+    if (payload.nota < 0 || payload.nota > 10) {
+        throw new Error('A nota deve estar entre 0 e 10.');
+    }
+    if (payload.dataCom !== null && (payload.dataCom < 1 || payload.dataCom > 31)) {
+        throw new Error('A Data Com deve estar entre 1 e 31.');
+    }
+    if (payload.dataPg !== null && (payload.dataPg < 1 || payload.dataPg > 31)) {
+        throw new Error('A data de pagamento deve estar entre 1 e 31.');
+    }
+}
+
+async function salvarAtivo() {
+    if (!usuarioAtual) {
+        alert('Faça login primeiro!');
+        return;
+    }
+
+    const payload = {
+        uid: usuarioAtual.uid,
+        ticker: normalizarTicker(camposAtivo.ticker.value),
+        quantidade: numeroSeguro(camposAtivo.quantidade.value, 0),
+        precoMedio: numeroSeguro(camposAtivo.precoMedio.value, 0),
+        nota: numeroSeguro(camposAtivo.nota.value, 0),
+        precoTeto: numeroSeguro(camposAtivo.precoTeto.value, 0),
+        dataCom: diaValido(camposAtivo.dataCom.value),
+        dataPg: diaValido(camposAtivo.dataPg.value),
+        segmento: camposAtivo.segmento.value || 'Outros',
+        timestamp: serverTimestamp()
+    };
+
+    try {
+        validarPayloadAtivo(payload);
+
+        if (idEdicaoAtiva) {
+            await updateDoc(doc(db, 'ativos', idEdicaoAtiva), payload);
+        } else {
+            await addDoc(collection(db, 'ativos'), payload);
+        }
+
+        cancelarEdicao();
+    } catch (erro) {
+        alert(`Erro ao salvar: ${erro.message}`);
+    }
+}
+
+async function prepararEdicao(id) {
+    try {
+        const documento = await getDoc(doc(db, 'ativos', id));
+        if (!documento.exists()) return;
+
+        const item = documento.data();
+        camposAtivo.ticker.value = item.ticker || '';
+        camposAtivo.quantidade.value = item.quantidade || '';
+        camposAtivo.precoMedio.value = item.precoMedio || '';
+        camposAtivo.nota.value = item.nota || '';
+        camposAtivo.precoTeto.value = item.precoTeto || '';
+        camposAtivo.dataCom.value = item.dataCom || '';
+        camposAtivo.dataPg.value = item.dataPg || '';
+        camposAtivo.segmento.value = item.segmento || 'Outros';
+
+        idEdicaoAtiva = id;
+        elementos.btnRegistrar.textContent = 'Atualizar Ativo';
+        elementos.btnCancelar.classList.remove('hidden');
+        elementos.formTitulo.innerHTML = '<span class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span> Editando Ativo';
+    } catch (erro) {
+        alert(`Erro ao carregar ativo para edição: ${erro.message}`);
+    }
+}
+
+function cancelarEdicao() {
+    idEdicaoAtiva = null;
+    elementos.btnRegistrar.textContent = 'Salvar no Portfólio';
+    elementos.btnCancelar.classList.add('hidden');
+    elementos.formTitulo.innerHTML = '<span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Gerenciar Ativo';
+
+    Object.values(camposAtivo).forEach((campo) => {
+        if ('value' in campo) {
+            campo.value = '';
+        }
+    });
+
+    camposAtivo.segmento.value = 'Papel';
+}
+
+async function registrarProvento() {
+    if (!usuarioAtual) {
+        alert('Faça login primeiro!');
+        return;
+    }
+
+    const ticker = normalizarTicker(camposProvento.ticker.value);
+    const valor = numeroSeguro(camposProvento.valor.value, NaN);
+    const mesAno = camposProvento.data.value;
+
+    if (!ticker || !Number.isFinite(valor) || valor <= 0 || !mesAno) {
+        alert('Preencha ticker, valor e mês corretamente.');
+        return;
+    }
+
+    try {
+        await addDoc(collection(db, 'proventos'), {
+            uid: usuarioAtual.uid,
+            ticker,
+            valor,
+            mesAno,
+            timestamp: serverTimestamp()
+        });
+
+        camposProvento.ticker.value = '';
+        camposProvento.valor.value = '';
+        camposProvento.data.value = '';
+        alert('Provento registrado com sucesso!');
+    } catch (erro) {
+        alert(`Erro ao registrar provento: ${erro.message}`);
+    }
+}
+
+function iniciarEventosUI() {
+    document.getElementById('btn-ghost').addEventListener('click', () => {
+        isGhostMode = !isGhostMode;
+        document.body.classList.toggle('ghost-mode', isGhostMode);
+        document.getElementById('ghost-icon').innerText = isGhostMode ? '🙈' : '👁️';
+    });
+
+    document.getElementById('container-filtros').addEventListener('click', (evento) => {
+        const botao = evento.target.closest('.btn-filtro');
+        if (!botao) return;
+
+        filtroAtivo = botao.dataset.filtro;
+        document.querySelectorAll('.btn-filtro').forEach((item) => {
+            item.classList.toggle('active', item.dataset.filtro === filtroAtivo);
+        });
+
+        renderizarTabela();
+    });
+
+    document.getElementById('abas-nav').addEventListener('click', (evento) => {
+        const botao = evento.target.closest('button[data-aba]');
+        if (!botao) return;
+
+        const aba = botao.dataset.aba;
+        elementos.secaoDash.classList.toggle('hidden', aba !== 'dash');
+        elementos.secaoProventos.classList.toggle('hidden', aba !== 'proventos');
+
+        document.querySelectorAll('#abas-nav button').forEach((item) => {
+            item.classList.toggle('text-white', item.dataset.aba === aba);
+            item.classList.toggle('tab-active', item.dataset.aba === aba);
+        });
+    });
+
+    elementos.caixaDisp.addEventListener('input', renderizarTabela);
+    elementos.btnRegistrar.addEventListener('click', salvarAtivo);
+    elementos.btnCancelar.addEventListener('click', cancelarEdicao);
+    elementos.btnRegistrarProvento.addEventListener('click', registrarProvento);
+
+    elementos.tabelaCorpo.addEventListener('click', async (evento) => {
+        const btnEditar = evento.target.closest('.btn-editar');
+        const btnDeletar = evento.target.closest('.btn-deletar');
+
+        if (btnEditar) {
+            await prepararEdicao(btnEditar.dataset.id);
+        }
+
+        if (btnDeletar) {
+            const confirmou = confirm('Deseja realmente excluir este ativo?');
+            if (!confirmou) return;
+
+            try {
+                await deleteDoc(doc(db, 'ativos', btnDeletar.dataset.id));
+                if (idEdicaoAtiva === btnDeletar.dataset.id) {
+                    cancelarEdicao();
+                }
+            } catch (erro) {
+                alert(`Erro ao excluir: ${erro.message}`);
+            }
+        }
+    });
+}
+
+iniciarEventosUI();
+
+onAuthStateChanged(auth, (user) => {
+    limparAssinaturas();
+
+    if (user) {
+        usuarioAtual = user;
+        atualizarEstadoLogin(true);
+        assinarAtivos();
+        assinarProventos();
+        return;
+    }
+
+    usuarioAtual = null;
+    cancelarEdicao();
+    atualizarEstadoLogin(false);
+    resetarDashboard();
+});
