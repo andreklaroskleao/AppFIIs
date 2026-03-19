@@ -209,18 +209,21 @@ window.perguntarIA = async () => {
         abaixoTeto: a.preco <= a.precoTeto
     }));
 
+    // mensagem do usuário
     chat.innerHTML += `
         <div class='mb-2 p-2 bg-slate-800/40 rounded-lg text-[10px]'>
             <span class='text-slate-500 font-bold uppercase'>Você:</span> ${pergunta}
         </div>
     `;
 
+    // loading
     const box = document.createElement("div");
     box.className = "mb-4 p-2 border-l-2 border-purple-500 bg-purple-500/5 text-purple-200 text-[10px]";
-    box.innerHTML = "IA analisando...";
+    box.innerHTML = "<span class='animate-pulse italic'>IA analisando...</span>";
     chat.appendChild(box);
     chat.scrollTop = chat.scrollHeight;
 
+    // modelos gratuitos
     const modelos = [
         "mistralai/mistral-7b-instruct:free",
         "meta-llama/llama-3-8b-instruct:free"
@@ -256,7 +259,7 @@ window.perguntarIA = async () => {
             const resposta = data?.choices?.[0]?.message?.content;
 
             if (resposta) {
-                respostaFinal = `(${modelo.split('/')[1]}) ${resposta}`;
+                respostaFinal = `<span class='text-[9px] text-slate-500'>(${modelo})</span><br>${resposta}`;
                 break;
             }
 
@@ -265,13 +268,14 @@ window.perguntarIA = async () => {
         }
     }
 
-    // fallback final (sem API)
+    // fallback local (NUNCA quebra)
     if (!respostaFinal) {
         respostaFinal = gerarRespostaLocal(contextoCarteira, pergunta);
     }
 
     box.innerHTML = `
-        <span class='text-purple-400 font-black uppercase'>IA:</span> ${respostaFinal}
+        <span class='text-purple-400 font-black uppercase'>IA:</span><br>
+        ${respostaFinal}
     `;
 
     document.getElementById('pergunta-ia').value = "";
@@ -348,5 +352,5 @@ function gerarRespostaLocal(carteira, pergunta) {
         return "Carteira diversificada em " + new Set(carteira.map(a => a.segmento)).size + " segmentos.";
     }
 
-    return "Não consegui acessar IA externa, mas sua carteira está ativa e monitorada.";
+    return "IA externa indisponível, mas seu portfólio está sendo monitorado.";
 }
