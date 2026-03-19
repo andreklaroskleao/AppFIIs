@@ -3,20 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FII-INSIGHT TERMINAL PRO</title>
+    <title>FII-INSIGHT PRO TERMINAL</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;900&display=swap');
-        body { background-color: #020617; color: #f1f5f9; font-family: 'Inter', sans-serif; scroll-behavior: smooth; }
-        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
-        .tab-active { border-bottom: 2px solid #10b981; color: #10b981; font-weight: 900; }
-        .tooltip { cursor: help; color: #64748b; font-size: 10px; margin-left: 4px; }
-        input[list]::-webkit-calendar-picker-indicator { display: none !important; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
-<body class="min-h-screen pb-10">
+<body class="min-h-screen">
+
     <datalist id="lista-fiis">
         <option value="MXRF11"> <option value="HGLG11"> <option value="XPML11"> <option value="BTLG11">
         <option value="VISC11"> <option value="KNIP11"> <option value="KNCR11"> <option value="GARE11">
@@ -25,10 +18,10 @@
     </datalist>
 
     <nav class="border-b border-slate-800 p-4 glass sticky top-0 z-50 flex justify-between items-center">
-        <div class="flex items-center gap-8">
-            <h1 class="text-xl font-black italic text-emerald-500 tracking-tighter">FII-INSIGHT <span class="text-[9px] bg-emerald-500/10 px-2 py-1 rounded text-emerald-400 not-italic ml-1">TERMINAL</span></h1>
-            <div class="flex gap-6 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                <button onclick="window.mudarAba('dash')" id="tab-dash" class="tab-active py-2">Monitor</button>
+        <div class="flex items-center gap-6">
+            <h1 class="text-lg font-black text-emerald-500 italic tracking-tighter">FII-INSIGHT <span class="text-[9px] bg-emerald-500/10 px-2 py-1 rounded text-emerald-400 not-italic ml-1">PRO</span></h1>
+            <div class="flex gap-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                <button onclick="window.mudarAba('dash')" id="tab-dash" class="tab-active py-2">Monitor Alpha</button>
                 <button onclick="window.mudarAba('proventos')" id="tab-proventos" class="py-2">Rendimentos</button>
             </div>
         </div>
@@ -36,39 +29,56 @@
     </nav>
 
     <main class="p-4 container mx-auto space-y-6">
+        
         <div id="secao-dash">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 <div class="glass p-5 rounded-2xl border-b-2 border-emerald-500">
-                    <p class="text-[9px] text-slate-500 font-black uppercase">Patrimônio <span class="tooltip" title="Soma total dos seus ativos multiplicada pela cotação atual.">ⓘ</span></p>
-                    <h2 id="total-patrimonio" class="text-xl font-black">R$ 0,00</h2>
+                    <div class="tooltip-container" tabindex="0">
+                        <p class="text-[9px] text-slate-500 font-black uppercase tracking-widest">Patrimônio</p>
+                        <span class="ml-1 text-emerald-500 text-[10px]">ⓘ</span>
+                        <div class="tooltip-content">Valor total das cotas multiplicado pela cotação atual de mercado.</div>
+                    </div>
+                    <h2 id="total-patrimonio" class="text-xl font-black mt-1 mono italic">R$ 0,00</h2>
                 </div>
                 <div class="glass p-5 rounded-2xl border-b-2 border-blue-500">
-                    <p class="text-[9px] text-slate-500 font-black uppercase">Renda por Hora <span class="tooltip" title="Estimativa de quanto sua carteira gera a cada hora baseada em 0,85% AM.">ⓘ</span></p>
-                    <h2 id="renda-hora" class="text-xl font-black text-blue-400">R$ 0,00</h2>
+                    <div class="tooltip-container" tabindex="0">
+                        <p class="text-[9px] text-slate-500 font-black uppercase tracking-widest">Renda por Hora</p>
+                        <span class="ml-1 text-blue-500 text-[10px]">ⓘ</span>
+                        <div class="tooltip-content">Estimativa de ganho passivo por hora (base 24h/dia).</div>
+                    </div>
+                    <h2 id="renda-hora" class="text-xl font-black text-blue-400 mt-1 mono">R$ 0,00</h2>
                 </div>
                 <div class="glass p-5 rounded-2xl border-b-2 border-purple-500">
-                    <p class="text-[9px] text-slate-500 font-black uppercase">Yield on Cost <span class="tooltip" title="Rendimento anual baseado no seu preço médio original.">ⓘ</span></p>
-                    <h2 id="yoc-medio" class="text-xl font-black text-purple-400">0.00%</h2>
+                    <div class="tooltip-container" tabindex="0">
+                        <p class="text-[9px] text-slate-500 font-black uppercase tracking-widest">Yield on Cost</p>
+                        <span class="ml-1 text-purple-400 text-[10px]">ⓘ</span>
+                        <div class="tooltip-content">Rentabilidade baseada no seu Preço Médio histórico.</div>
+                    </div>
+                    <h2 id="yoc-medio" class="text-xl font-black text-purple-400 mt-1 mono">0.00%</h2>
                 </div>
                 <div class="glass p-5 rounded-2xl border-b-2 border-red-500">
-                    <p class="text-[9px] text-slate-500 font-black uppercase">Risco Estresse <span class="tooltip" title="Simulação de queda patrimonial caso a Selic suba bruscamente.">ⓘ</span></p>
-                    <h2 id="queda-pat" class="text-xl font-black text-red-500">- R$ 0,00</h2>
+                    <div class="tooltip-container" tabindex="0">
+                        <p class="text-[9px] text-slate-500 font-black uppercase tracking-widest">Risco de Estresse</p>
+                        <span class="ml-1 text-red-500 text-[10px]">ⓘ</span>
+                        <div class="tooltip-content">Simulação de queda patrimonial em cenário de juros altos (12%).</div>
+                    </div>
+                    <h2 id="queda-pat" class="text-xl font-black text-red-500 mt-1 mono">- R$ 0,00</h2>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="space-y-6">
-                    <div class="glass p-6 rounded-3xl border-t-2 border-emerald-500/30">
-                        <h3 id="form-titulo" class="text-xs font-black uppercase text-emerald-400 mb-4">Novo Aporte</h3>
+                    <div class="glass p-6 rounded-3xl border border-white/5">
+                        <h3 id="form-titulo" class="text-xs font-black uppercase text-emerald-400 mb-4 tracking-tighter">Gerenciar Ativo</h3>
                         <div class="space-y-2">
-                            <input type="text" id="ticker-input" list="lista-fiis" placeholder="TICKER" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 uppercase font-bold text-white outline-none focus:border-emerald-500">
+                            <input type="text" id="ticker-input" list="lista-fiis" placeholder="TICKER (Ex: MXRF11)" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 uppercase font-bold text-white outline-none focus:border-emerald-500">
                             <div class="grid grid-cols-2 gap-2">
-                                <input type="number" id="qtd-input" placeholder="QTD" class="bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs">
-                                <input type="number" id="pm-input" placeholder="P. MÉDIO" class="bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs">
+                                <input type="number" id="qtd-input" placeholder="QUANTIDADE" class="bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs text-white">
+                                <input type="number" id="pm-input" placeholder="PREÇO MÉDIO" class="bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs text-white">
                             </div>
                             <div class="grid grid-cols-2 gap-2">
                                 <input type="number" id="nota-input" placeholder="NOTA (1-10)" class="bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs text-blue-400">
-                                <input type="number" id="teto-input" placeholder="P. TETO" class="bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs text-emerald-400">
+                                <input type="number" id="teto-input" placeholder="PREÇO TETO" class="bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs text-emerald-400">
                             </div>
                             <div class="grid grid-cols-2 gap-2">
                                 <select id="segmento-input" class="bg-slate-900 border border-slate-700 rounded-lg p-3 text-[10px] text-slate-400 uppercase font-black">
@@ -79,14 +89,14 @@
                                 </select>
                                 <input type="date" id="data-compra-input" class="bg-slate-900 border border-slate-700 rounded-lg p-3 text-[10px] text-slate-400">
                             </div>
-                            <button onclick="window.adicionarFundo()" id="btn-registrar" class="w-full bg-emerald-600 font-black py-4 rounded-xl uppercase text-xs shadow-lg hover:bg-emerald-500 transition-all">Registrar Ativo</button>
+                            <button onclick="window.adicionarFundo()" id="btn-registrar" class="w-full bg-emerald-600 font-black py-4 rounded-xl uppercase text-xs shadow-lg hover:bg-emerald-500 transition-all">Salvar no Portfólio</button>
                             <button onclick="window.cancelarEdicao()" id="btn-cancelar" class="hidden w-full text-slate-500 text-[10px] font-bold uppercase mt-2">Cancelar Edição</button>
                         </div>
                     </div>
 
                     <div class="glass p-5 rounded-3xl border-l-4 border-purple-500">
                         <h3 class="text-[10px] font-black uppercase text-purple-400 mb-3 italic flex items-center gap-2">
-                            <span class="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span> Consultoria IA
+                            <span class="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span> Consultoria IA Interativa
                         </h3>
                         <div id="chat-ia-respostas" class="text-[10px] text-slate-400 h-32 overflow-y-auto mb-3 space-y-3 p-3 bg-slate-950/40 rounded-xl border border-slate-800 scrollbar-hide">
                             <p class="italic text-slate-500">Sou seu analista. Pergunte sobre "risco de diversificação", "onde aportar" ou "qual setor focar".</p>
@@ -101,31 +111,76 @@
                 <div class="lg:col-span-2 space-y-6">
                     <div class="glass p-6 rounded-3xl border-l-4 border-blue-500 bg-gradient-to-r from-blue-900/10 to-transparent">
                         <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xs font-black uppercase text-blue-400">Aportes Inteligentes <span class="tooltip" title="Sugestões baseadas nas notas e no seu caixa disponível.">ⓘ</span></h3>
+                            <h3 class="text-xs font-black uppercase text-blue-400">Sugestões de Rebalanceamento</h3>
                             <input type="number" id="caixa-disponivel" onchange="window.carregarDados()" placeholder="CAIXA R$" class="bg-slate-900 border border-blue-900/50 rounded-lg p-2 text-[10px] text-blue-400 w-32 font-black">
                         </div>
-                        <div id="painel-aportes" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                        <div id="painel-aportes" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            </div>
                     </div>
 
-                    <div class="glass rounded-3xl overflow-hidden">
+                    <div class="glass rounded-3xl overflow-hidden shadow-2xl">
                         <table class="w-full text-left text-[11px]">
-                            <thead class="bg-slate-900/80 text-slate-500 font-black uppercase">
+                            <thead class="bg-slate-900/80 text-slate-500 font-black uppercase tracking-widest">
                                 <tr>
                                     <th class="p-4">Ativo</th>
                                     <th class="p-4">Preço / Teto</th>
-                                    <th class="p-4">Peso (Alvo vs Real)</th>
-                                    <th class="p-4">Total</th>
+                                    <th class="p-4">Alocação (Real vs Alvo)</th>
+                                    <th class="p-4">Posição Total</th>
                                     <th class="p-4 text-center">Ações</th>
                                 </tr>
                             </thead>
-                            <tbody id="tabela-corpo" class="divide-y divide-slate-800"></tbody>
+                            <tbody id="tabela-corpo" class="divide-y divide-slate-800">
+                                </tbody>
                         </table>
                     </div>
                 </div>
             </div>
         </div>
+
+        <div id="secao-proventos" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="glass p-6 rounded-3xl h-fit border-t-2 border-blue-500 shadow-xl">
+                <h3 class="text-xs font-black uppercase text-blue-400 mb-4">Lançar Dividendos</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-[9px] uppercase font-black text-slate-500 ml-1">Ativo</label>
+                        <input type="text" id="prov-ticker" list="lista-fiis" placeholder="TICKER" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 uppercase font-bold text-white">
+                    </div>
+                    <div>
+                        <label class="text-[9px] uppercase font-black text-slate-500 ml-1">Valor Total Recebido</label>
+                        <input type="number" id="prov-valor" placeholder="R$ 0,00" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 font-black text-emerald-400">
+                    </div>
+                    <div>
+                        <label class="text-[9px] uppercase font-black text-slate-500 ml-1">Mês de Referência</label>
+                        <input type="month" id="prov-data" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-slate-400">
+                    </div>
+                    <button onclick="window.registrarProvento()" class="w-full bg-blue-600 font-black py-4 rounded-xl uppercase text-xs hover:bg-blue-500 transition shadow-lg shadow-blue-900/20">Registrar na Bola de Neve</button>
+                </div>
+            </div>
+            
+            <div class="lg:col-span-2 glass p-6 rounded-3xl min-h-[450px] flex flex-col shadow-xl">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xs font-black uppercase text-slate-500 tracking-widest">Evolução de Renda Mensal</h3>
+                    <span class="text-[10px] bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full font-bold">Histórico Consolidado</span>
+                </div>
+                <div class="flex-1 min-h-[350px]">
+                    <canvas id="chartProventos"></canvas>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <script type="module" src="app.js"></script>
+
+    <script>
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.tooltip-container')) {
+                document.querySelectorAll('.tooltip-content').forEach(c => {
+                    c.style.visibility = 'hidden';
+                    c.style.opacity = '0';
+                });
+            }
+        });
+    </script>
 </body>
 </html>
