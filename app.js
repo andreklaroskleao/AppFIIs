@@ -3,7 +3,7 @@ import { collection, addDoc, query, where, onSnapshot } from "https://www.gstati
 
 let usuarioAtual = null;
 let chartInstancia = null;
-const API_TOKEN = 'SUA_CHAVE_BRAPI_AQUI'; // Pegue grátis em brapi.dev
+const API_TOKEN = 'hshuPrGV3kvLM6Yh8FEDrD'; // Pegue grátis em brapi.dev
 
 // --- LOGIN ---
 auth.onAuthStateChanged(user => {
