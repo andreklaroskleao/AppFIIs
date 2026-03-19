@@ -102,3 +102,17 @@ body {
         text-transform: uppercase; 
     }
 }
+/* Garante que as células da tabela tenham um distanciamento mínimo */
+td {
+    white-space: nowrap; /* Impede quebras de linha estranhas em nomes curtos */
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+}
+
+/* No Mobile, removemos esse espaçamento lateral para caber na tela */
+@media (max-width: 768px) {
+    td {
+        white-space: normal;
+        padding: 0.75rem 0 !important;
+    }
+}
