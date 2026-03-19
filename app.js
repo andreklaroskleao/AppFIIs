@@ -226,7 +226,7 @@ window.perguntarIA = async () => {
             const promptGeral = `Você é um analista financeiro. Carteira: ${JSON.stringify(contextoCarteira)}. Pergunta: ${pergunta}`;
             
             const result = await model.generateContent(promptGeral);
-            const response = await result.response;
+            const response = result.response;
             const text = response.text();
             
             tempDiv.innerHTML = `<span class='text-purple-400 font-black uppercase'>Alpha IA (${nomeModelo}):</span> ${text}`;
