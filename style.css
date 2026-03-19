@@ -1,4 +1,4 @@
-/* Configurações Gerais */
+/* style.css */
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;900&display=swap');
 
 :root {
@@ -6,7 +6,6 @@
     --glass: rgba(15, 23, 42, 0.7);
     --emerald: #10b981;
     --blue: #3b82f6;
-    --purple: #a855f7;
     --slate-500: #64748b;
 }
 
@@ -14,7 +13,8 @@ body {
     background-color: var(--bg-dark); 
     color: #f1f5f9; 
     font-family: 'Inter', sans-serif; 
-    -webkit-tap-highlight-color: transparent; 
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
 }
 
 .glass { 
@@ -25,73 +25,46 @@ body {
 
 .mono { font-family: 'JetBrains Mono', monospace; }
 
-.tab-active { 
-    border-bottom: 2px solid var(--emerald); 
-    color: var(--emerald); 
-    font-weight: 900; 
+/* TABELA E ESPAÇAMENTO */
+table { width: 100%; border-collapse: separate; border-spacing: 0; }
+
+th { 
+    padding: 1rem 1.5rem; 
+    letter-spacing: 0.1em; 
+    border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
-/* TOOLTIPS PREMIUM */
-.tooltip-container { 
-    position: relative; 
-    display: inline-flex; 
-    align-items: center; 
-    cursor: help; 
+td { 
+    padding: 1.25rem 2rem !important; /* Aumento do respiro horizontal */
+    vertical-align: middle;
 }
 
+/* Tooltips */
+.tooltip-container { position: relative; display: inline-flex; align-items: center; cursor: help; }
 .tooltip-content {
-    visibility: hidden; 
-    position: absolute; 
-    bottom: 130%; 
-    left: 50%; 
-    transform: translateX(-50%);
-    background: #1e293b; 
-    color: #f1f5f9; 
-    padding: 10px; 
-    border-radius: 10px;
-    font-size: 10px; 
-    width: 180px; 
-    z-index: 100; 
-    opacity: 0; 
-    transition: all 0.2s ease;
-    border: 1px solid rgba(255,255,255,0.1); 
-    box-shadow: 0 10px 20px rgba(0,0,0,0.4); 
-    pointer-events: none;
+    visibility: hidden; position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%);
+    background: #1e293b; color: #f1f5f9; padding: 10px; border-radius: 10px;
+    font-size: 10px; width: 180px; z-index: 100; opacity: 0; transition: all 0.2s ease;
+    border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 20px rgba(0,0,0,0.4);
 }
+.tooltip-container:hover .tooltip-content { visibility: visible; opacity: 1; }
 
-.tooltip-content::after { 
-    content: ""; 
-    position: absolute; 
-    top: 100%; 
-    left: 50%; 
-    margin-left: -5px; 
-    border: 5px solid; 
-    border-color: #1e293b transparent transparent transparent; 
-}
-
-.tooltip-container:hover .tooltip-content, 
-.tooltip-container:focus .tooltip-content { 
-    visibility: visible; 
-    opacity: 1; 
-}
-
-/* TABELA RESPONSIVA (Mobile First) */
-@media (max-width: 768px) {
+/* MOBILE RESPONSIVE (Cards) */
+@media (max-width: 1024px) {
     table, thead, tbody, th, td, tr { display: block; }
     thead { display: none; }
     tr { 
-        margin-bottom: 1rem; 
-        border: 1px solid rgba(255,255,255,0.05); 
-        border-radius: 1rem; 
-        background: rgba(15, 23, 42, 0.4); 
+        margin-bottom: 1.5rem; 
+        border: 1px solid rgba(255,255,255,0.1); 
+        border-radius: 1.5rem; 
+        background: rgba(15, 23, 42, 0.5); 
         padding: 1rem; 
     }
     td { 
         display: flex; 
         justify-content: space-between; 
         align-items: center; 
-        border: none !important; 
-        padding: 0.5rem 0 !important; 
+        padding: 0.75rem 0 !important; 
         border-bottom: 1px solid rgba(255,255,255,0.03) !important; 
     }
     td::before { 
@@ -101,18 +74,7 @@ body {
         color: var(--slate-500); 
         text-transform: uppercase; 
     }
-}
-/* Garante que as células da tabela tenham um distanciamento mínimo */
-td {
-    white-space: nowrap; /* Impede quebras de linha estranhas em nomes curtos */
-    padding-left: 1.5rem !important;
-    padding-right: 1.5rem !important;
+    td:last-child { border: none !important; margin-top: 10px; justify-content: center; }
 }
 
-/* No Mobile, removemos esse espaçamento lateral para caber na tela */
-@media (max-width: 768px) {
-    td {
-        white-space: normal;
-        padding: 0.75rem 0 !important;
-    }
-}
+.tab-active { border-bottom: 2px solid var(--emerald); color: var(--emerald); font-weight: 900; }
