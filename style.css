@@ -1,13 +1,64 @@
-/* Efeito de Skeleton Loading para quando os dados estiverem vindo da API */
-.loading {
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+/* Tooltip Container */
+.tooltip-container {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: help;
 }
 
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: .5; }
+/* O Balão de Texto */
+.tooltip-content {
+    visibility: hidden;
+    position: absolute;
+    bottom: 125%; /* Aparece acima do ícone */
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #1e293b; /* Slate 800 */
+    color: #f1f5f9;
+    text-align: center;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.4;
+    width: 180px;
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.3s, visibility 0.3s;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+    pointer-events: none; /* Não atrapalha o clique */
 }
 
-input[type=number]::-webkit-inner-spin-button {
-    -webkit-appearance: none;
+/* Seta do Balão */
+.tooltip-content::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #1e293b transparent transparent transparent;
+}
+
+/* Mostrar ao passar o mouse ou focar (Desktop) */
+.tooltip-container:hover .tooltip-content,
+.tooltip-container:focus .tooltip-content {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Ajuste para telas pequenas (Mobile) */
+@media (max-width: 640px) {
+    .tooltip-content {
+        width: 140px;
+        left: auto;
+        right: 0;
+        transform: translateX(0);
+    }
+    .tooltip-content::after {
+        left: auto;
+        right: 10px;
+    }
 }
