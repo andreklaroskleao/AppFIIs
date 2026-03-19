@@ -216,7 +216,7 @@ window.perguntarIA = async () => {
     chat.scrollTop = chat.scrollHeight;
 
     // Lista de modelos para tentar (do mais novo ao mais estável)
-    const modelosParaTentar = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"];
+    const modelosParaTentar = ["gemini-1.5-flash", "gemini-1.5-pro"];
     let sucesso = false;
 
     for (const nomeModelo of modelosParaTentar) {
