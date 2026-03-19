@@ -1,9 +1,12 @@
 import { db, auth, provider, signInWithPopup, signOut } from './firebase-config.js';
-import { collection, addDoc, query, where, onSnapshot, doc, deleteDoc, updateDoc, getDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, addDoc, query, where, onSnapshot, doc, deleteDoc, updateDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
 
-const API_KEY = "hshuPrGV3kvLM6Yh8FEDrD";
-const GEMINI_API_KEY = "AIzaSyDrEtdPXFXydgQcb5LEiyS9re7S3PhzUw8"; //
+// --- CONFIGURAÇÕES ---
+const API_KEY_BRAPI = "hshuPrGV3kvLM6Yh8FEDrD";
+const GEMINI_API_KEY = "AIzaSyDrEtdPXFXydgQcb5LEiyS9re7S3PhzUw8";
+
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 let usuarioAtual = null;
 let idEdicaoAtiva = null;
@@ -11,9 +14,7 @@ let filtroAtivo = "Todos";
 let isGhostMode = false;
 let dadosAtuaisParaIA = []; 
 
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-
-// --- AUTENTICAÇÃO ---
+// --- SISTEMA DE AUTENTICAÇÃO ---
 auth.onAuthStateChanged(user => {
     const info = document.getElementById('user-info');
     if (user) {
@@ -29,7 +30,7 @@ auth.onAuthStateChanged(user => {
 window.fazerLogin = () => signInWithPopup(auth, provider);
 window.fazerLogout = () => signOut(auth);
 
-// --- CONTROLES DE UI ---
+// --- UTILITÁRIOS E UI ---
 window.toggleGhost = () => {
     isGhostMode = !isGhostMode;
     document.body.classList.toggle('ghost-mode', isGhostMode);
@@ -51,13 +52,13 @@ window.mudarAba = (aba) => {
 
 async function fetchBrapi(ticker) {
     try {
-        const res = await fetch(`https://brapi.dev/api/quote/${ticker.trim().toUpperCase()}?token=${API_KEY}`);
+        const res = await fetch(`https://brapi.dev/api/quote/${ticker.trim().toUpperCase()}?token=${API_KEY_BRAPI}`);
         const data = await res.json();
         return data.results ? data.results[0] : null;
     } catch { return null; }
 }
 
-// --- ENGINE DE DADOS (CORREÇÃO DE UNDEFINED E TOFIXED) ---
+// --- ENGINE DE DADOS (CORREÇÃO DE UNDEFINED E CÁLCULOS) ---
 window.carregarDados = () => {
     if (!usuarioAtual) return;
     const q = query(collection(db, "ativos"), where("uid", "==", usuarioAtual.uid));
@@ -68,6 +69,7 @@ window.carregarDados = () => {
         const caixa = parseFloat(document.getElementById('caixa-disponivel')?.value) || 0;
         const diaAtual = new Date().getDate();
 
+        // Processamento dos Ativos
         const ativosRaw = await Promise.all(snap.docs.map(async d => {
             const i = d.data();
             const api = await fetchBrapi(i.ticker);
@@ -85,25 +87,29 @@ window.carregarDados = () => {
             };
         }));
 
-        ativosRaw.forEach(a => { patTotal += a.total; somaNotas += (a.nota || 0); custoTotal += a.inv; });
+        ativosRaw.forEach(a => { 
+            patTotal += a.total; 
+            somaNotas += (parseFloat(a.nota) || 0); 
+            custoTotal += a.inv; 
+        });
         dadosAtuaisParaIA = ativosRaw; 
 
         const ativosFiltrados = filtroAtivo === "Todos" ? ativosRaw : ativosRaw.filter(a => a.segmento === filtroAtivo);
         let html = ''; let sug = [];
 
         ativosFiltrados.forEach(f => {
-            const pIdeal = somaNotas > 0 ? (f.nota / somaNotas) : 0;
+            const pIdeal = somaNotas > 0 ? ((parseFloat(f.nota) || 0) / somaNotas) : 0;
             const pReal = patTotal > 0 ? (f.total / patTotal) : 0;
             const rendAprox = (f.quantidade || 0) * f.divEstimado;
             projecaoMes += rendAprox;
 
-            // Sugestão de aporte apenas se preço for válido
             if (pReal < pIdeal && f.preco > 0 && f.preco <= (f.precoTeto || 99999)) {
                 sug.push({ ticker: f.ticker, qtd: Math.floor(((patTotal + caixa) * pIdeal - f.total) / f.preco), nota: f.nota });
             }
 
             const isDataComPerto = f.dataCom && (Math.abs(f.dataCom - diaAtual) <= 3);
 
+            // TABELA COM TRATAMENTO DE CAMPOS VAZIOS (SOLUÇÃO PARA O UNDEFINED)
             html += `
                 <tr class="hover:bg-slate-800/40 border-b border-slate-800/50 transition-colors">
                     <td class="p-4">
@@ -112,7 +118,7 @@ window.carregarDados = () => {
                                 <span class="font-black text-emerald-400 text-sm tracking-tighter">${f.ticker}</span>
                                 ${isDataComPerto ? '<span class="badge-com">DATA COM</span>' : ''}
                             </div>
-                            <span class="text-[9px] text-slate-500 uppercase font-black">${f.segmento || 'FII'}</span>
+                            <span class="text-[9px] text-slate-500 uppercase font-black">${f.segmento || 'FII / OUTRO'}</span>
                         </div>
                     </td>
                     <td class="p-4 text-center">
@@ -129,21 +135,21 @@ window.carregarDados = () => {
                             <span class="text-[8px] text-slate-500 font-bold uppercase mb-1">Agenda</span>
                             <div class="flex gap-2">
                                 <div class="bg-slate-900 px-2 py-1 rounded border border-white/5 min-w-[35px]">
-                                    <span class="text-[7px] text-blue-400 font-black block">COM</span>
-                                    <span class="text-white text-[10px] font-bold">${f.dataCom || '--'}</span>
+                                    <span class="text-[7px] text-blue-400 font-black block text-center">COM</span>
+                                    <span class="text-white text-[10px] font-bold block text-center">${f.dataCom || '--'}</span>
                                 </div>
                                 <div class="bg-slate-900 px-2 py-1 rounded border border-white/5 min-w-[35px]">
-                                    <span class="text-[7px] text-emerald-400 font-black block">PAGO</span>
-                                    <span class="text-white text-[10px] font-bold">${f.dataPg || '--'}</span>
+                                    <span class="text-[7px] text-emerald-400 font-black block text-center">PAGO</span>
+                                    <span class="text-white text-[10px] font-bold block text-center">${f.dataPg || '--'}</span>
                                 </div>
                             </div>
                         </div>
                     </td>
                     <td class="p-4">
-                        <div class="w-full min-w-[120px]">
+                        <div class="w-full min-w-[150px]">
                             <div class="flex justify-between text-[8px] font-black text-slate-500 mb-1 uppercase">
                                 <span class="text-blue-400">${(pReal*100).toFixed(1)}% Real / ${(pIdeal*100).toFixed(1)}% Alvo</span>
-                                <span class="text-purple-400">R$ ${rendAprox.toFixed(2)}</span>
+                                <span class="text-purple-400">R$ ${rendAprox.toFixed(2)} Est.</span>
                             </div>
                             <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-white/5">
                                 <div class="bg-blue-600 h-full" style="width:${(pReal*100)}%"></div>
@@ -165,24 +171,30 @@ window.carregarDados = () => {
                 </tr>`;
         });
 
-        document.getElementById('tabela-corpo').innerHTML = html || '<tr><td colspan="6" class="p-10 text-center text-slate-500 italic">Nenhum ativo encontrado.</td></tr>';
+        document.getElementById('tabela-corpo').innerHTML = html || '<tr><td colspan="6" class="p-10 text-center text-slate-500 italic">Nenhum ativo cadastrado.</td></tr>';
         document.getElementById('total-patrimonio').innerHTML = `R$ ${patTotal.toLocaleString('pt-BR', {minimumFractionDigits:2})}`;
         document.getElementById('renda-mes').innerHTML = `R$ ${projecaoMes.toLocaleString('pt-BR', {minimumFractionDigits:2})}`;
         document.getElementById('renda-hora').innerHTML = `R$ ${(projecaoMes/720).toLocaleString('pt-BR', {minimumFractionDigits:4})} / hora`;
         document.getElementById('yoc-medio').innerText = `${((projecaoMes*12/(custoTotal || 1))*100).toFixed(2)}%`;
-        document.getElementById('queda-pat').innerHTML = `- R$ ${(patTotal*0.12).toLocaleString('pt-BR', {minimumFractionDigits:2})}`;
+        
+        // Exemplo de métrica de risco adaptada
+        const quedaElement = document.getElementById('queda-pat');
+        if(quedaElement) quedaElement.innerHTML = `- R$ ${(patTotal*0.05).toLocaleString('pt-BR', {minimumFractionDigits:2})} (Stress 5%)`;
 
-        // Painel de Aportes
-        document.getElementById('painel-aportes').innerHTML = sug.sort((a,b)=>b.nota-a.nota).slice(0,2).map(s => `
-            <div class="bg-slate-900/60 p-4 rounded-2xl border border-blue-900/30">
-                <div class="text-[8px] text-blue-400 font-black mb-1 uppercase tracking-widest">Aporte Alpha</div>
-                <div class="text-lg font-black text-white">${s.ticker} <span class="text-emerald-500">+${s.qtd} un.</span></div>
-            </div>
-        `).join('') || '<p class="text-[10px] italic p-4 text-slate-600">Sem sugestões no momento.</p>';
+        // Painel de Aportes Sugeridos
+        const painelSug = document.getElementById('painel-aportes');
+        if(painelSug) {
+            painelSug.innerHTML = sug.sort((a,b)=>b.nota-a.nota).slice(0,2).map(s => `
+                <div class="bg-slate-900/60 p-4 rounded-2xl border border-blue-900/30">
+                    <div class="text-[8px] text-blue-400 font-black mb-1 uppercase tracking-widest">Rebalancear</div>
+                    <div class="text-lg font-black text-white">${s.ticker} <span class="text-emerald-500">+${s.qtd} un.</span></div>
+                </div>
+            `).join('') || '<p class="text-[10px] italic p-4 text-slate-600">Alocação equilibrada.</p>';
+        }
     });
 };
 
-// --- IA ANALÍTICA COM GEMINI (CORREÇÃO ERRO 404) ---
+// --- IA ANALÍTICA (GEMINI COM FALLBACK E CORREÇÃO 404) ---
 window.perguntarIA = async () => {
     const pergunta = document.getElementById('pergunta-ia').value;
     const chat = document.getElementById('chat-ia-respostas');
@@ -191,46 +203,50 @@ window.perguntarIA = async () => {
 
     const contextoCarteira = dadosAtuaisParaIA.map(a => ({
         ticker: a.ticker,
-        segmento: a.segmento,
+        segmento: a.segmento || 'FII',
         quantidade: a.quantidade,
         precoAtual: a.preco,
         precoTeto: a.precoTeto,
-        rendimentoEstimado: (a.quantidade * a.divEstimado).toFixed(2)
+        rendimentoMensal: (a.quantidade * a.divEstimado).toFixed(2)
     }));
 
-    chat.innerHTML += `<div class='mb-2 p-2 bg-slate-800/40 rounded-lg text-[10px]'><span class='text-slate-500 font-bold'>VOCÊ:</span> ${pergunta}</div>`;
+    chat.innerHTML += `<div class='mb-2 p-2 bg-slate-800/40 rounded-lg text-[10px]'><span class='text-slate-500 font-bold uppercase'>Você:</span> ${pergunta}</div>`;
     const tempDiv = document.createElement("div");
     tempDiv.className = "mb-4 p-2 border-l-2 border-purple-500 bg-purple-500/5 text-purple-200 text-[10px]";
-    tempDiv.innerHTML = "<span class='animate-pulse'>Alpha IA está analisando sua carteira...</span>";
+    tempDiv.innerHTML = "<span class='animate-pulse italic'>Alpha IA processando dados da carteira...</span>";
     chat.appendChild(tempDiv);
     chat.scrollTop = chat.scrollHeight;
 
     try {
-        // Correção do Modelo
+        // Forçamos o modelo 1.5-flash com tratamento de erro
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
         const promptGeral = `
-            Você é o Alpha Insight, consultor de FIIs.
-            Carteira: ${JSON.stringify(contextoCarteira)}
-            Total: R$ ${dadosAtuaisParaIA.reduce((a, b) => a + b.total, 0).toFixed(2)}
+            Você é o Alpha Insight, analista de investimentos sênior.
+            Contexto da Carteira do Usuário: ${JSON.stringify(contextoCarteira)}
+            Total Investido: R$ ${dadosAtuaisParaIA.reduce((a, b) => a + b.total, 0).toFixed(2)}
             
-            Responda de forma curta e técnica. Analise riscos de concentração e oportunidades abaixo do preço teto.
-            Pergunta: ${pergunta}
+            Regras:
+            1. Seja técnico, curto e use termos de mercado.
+            2. Analise se há ativos acima do preço teto.
+            3. Verifique a diversificação por segmento.
+            
+            Pergunta do usuário: ${pergunta}
         `;
 
         const result = await model.generateContent(promptGeral);
         const response = await result.response;
-        tempDiv.innerHTML = `<span class='text-purple-400 font-black'>ALPHA IA (Gemini):</span> ${response.text()}`;
+        tempDiv.innerHTML = `<span class='text-purple-400 font-black uppercase'>Alpha IA (Gemini):</span> ${response.text()}`;
     } catch (error) {
-        tempDiv.innerHTML = `<span class='text-red-400 font-black'>ERRO:</span> Verifique sua chave ou conexão.`;
-        console.error("Erro IA:", error);
+        console.error("Erro na IA:", error);
+        tempDiv.innerHTML = `<span class='text-red-400 font-black'>AVISO:</span> Não foi possível acessar o Gemini 1.5. Verifique se a chave API tem as permissões necessárias para o modelo Flash no Google AI Studio.`;
     }
 
     document.getElementById('pergunta-ia').value = "";
     chat.scrollTop = chat.scrollHeight;
 };
 
-// --- OPERAÇÕES CRUD ---
+// --- OPERAÇÕES DE BANCO DE DADOS (CRUD) ---
 window.adicionarFundo = async () => {
     const payload = {
         uid: usuarioAtual.uid,
@@ -241,37 +257,45 @@ window.adicionarFundo = async () => {
         precoTeto: parseFloat(document.getElementById('teto-input').value) || 0,
         dataCom: parseInt(document.getElementById('data-com-input').value) || null,
         dataPg: parseInt(document.getElementById('data-pg-input').value) || null,
-        segmento: document.getElementById('segmento-input').value,
+        segmento: document.getElementById('segmento-input').value || 'Outros',
         timestamp: serverTimestamp()
     };
 
-    idEdicaoAtiva ? await updateDoc(doc(db, "ativos", idEdicaoAtiva), payload) : await addDoc(collection(db, "ativos"), payload);
-    window.cancelarEdicao();
+    try {
+        idEdicaoAtiva ? await updateDoc(doc(db, "ativos", idEdicaoAtiva), payload) : await addDoc(collection(db, "ativos"), payload);
+        window.cancelarEdicao();
+    } catch (e) { alert("Erro ao salvar: " + e.message); }
 };
 
 window.prepararEdicao = async (id) => {
     const d = await getDoc(doc(db, "ativos", id));
     if (d.exists()) {
         const i = d.data();
-        document.getElementById('ticker-input').value = i.ticker;
-        document.getElementById('qtd-input').value = i.quantidade;
-        document.getElementById('pm-input').value = i.precoMedio;
-        document.getElementById('nota-input').value = i.nota;
-        document.getElementById('teto-input').value = i.precoTeto;
+        document.getElementById('ticker-input').value = i.ticker || "";
+        document.getElementById('qtd-input').value = i.quantidade || "";
+        document.getElementById('pm-input').value = i.precoMedio || "";
+        document.getElementById('nota-input').value = i.nota || "";
+        document.getElementById('teto-input').value = i.precoTeto || "";
         document.getElementById('data-com-input').value = i.dataCom || "";
         document.getElementById('data-pg-input').value = i.dataPg || "";
-        document.getElementById('segmento-input').value = i.segmento;
+        document.getElementById('segmento-input').value = i.segmento || "";
+        
         idEdicaoAtiva = id;
-        document.getElementById('btn-registrar').innerText = "Confirmar Edição";
-        document.getElementById('btn-cancelar').classList.remove('hidden');
+        const btnReg = document.getElementById('btn-registrar');
+        if(btnReg) btnReg.innerText = "Atualizar Ativo";
+        document.getElementById('btn-cancelar')?.classList.remove('hidden');
     }
 };
 
 window.cancelarEdicao = () => {
     idEdicaoAtiva = null;
-    document.getElementById('btn-registrar').innerText = "Salvar Ativo";
-    document.getElementById('btn-cancelar').classList.add('hidden');
-    ['ticker-input', 'qtd-input', 'pm-input', 'nota-input', 'teto-input', 'data-com-input', 'data-pg-input'].forEach(i => document.getElementById(i).value = '');
+    const btnReg = document.getElementById('btn-registrar');
+    if(btnReg) btnReg.innerText = "Adicionar Ativo";
+    document.getElementById('btn-cancelar')?.classList.add('hidden');
+    ['ticker-input', 'qtd-input', 'pm-input', 'nota-input', 'teto-input', 'data-com-input', 'data-pg-input', 'segmento-input'].forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.value = '';
+    });
 };
 
-window.deletarAtivo = (id) => confirm("Remover permanentemente?") && deleteDoc(doc(db, "ativos", id));
+window.deletarAtivo = (id) => confirm("Deseja realmente excluir este ativo?") && deleteDoc(doc(db, "ativos", id));
