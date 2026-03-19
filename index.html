@@ -166,6 +166,9 @@
                             </select>
                             <div id="erro-campo-segmento-ativo" class="mensagem-erro-campo hidden"></div>
 
+                            <textarea id="campo-observacao-ativo" rows="4" placeholder="Observações sobre o ativo" class="campo-formulario resize-none"></textarea>
+                            <div id="erro-campo-observacao-ativo" class="mensagem-erro-campo hidden"></div>
+
                             <button id="botao-salvar-ativo" type="button" class="w-full bg-emerald-600 hover:bg-emerald-500 font-black py-4 rounded-2xl uppercase text-[11px] shadow-lg shadow-emerald-900/20 transition-all mt-4">
                                 Salvar no Portfólio
                             </button>
@@ -184,16 +187,17 @@
                                 <thead class="bg-slate-900/50">
                                     <tr>
                                         <th class="p-6">Ativo</th>
-                                        <th class="p-6">Preço / Teto</th>
+                                        <th class="p-6">Valuation</th>
                                         <th class="p-6">Agenda</th>
-                                        <th class="p-6">Alocação / Projeção</th>
-                                        <th class="p-6 text-right">Posição Total</th>
+                                        <th class="p-6">Renda</th>
+                                        <th class="p-6">Posição</th>
+                                        <th class="p-6">Alocação</th>
                                         <th class="p-6 text-center">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody id="corpo-tabela-ativos" class="divide-y divide-slate-800/50">
                                     <tr>
-                                        <td colspan="6" class="p-10 text-center text-slate-500 italic">
+                                        <td colspan="7" class="p-10 text-center text-slate-500 italic">
                                             Faça login para carregar seus ativos.
                                         </td>
                                     </tr>
