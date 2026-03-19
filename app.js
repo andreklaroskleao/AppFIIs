@@ -1,6 +1,6 @@
 import { db, auth, provider, signInWithPopup, signOut } from './firebase-config.js';
 import { collection, addDoc, query, where, onSnapshot, doc, deleteDoc, updateDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai";
 
 // --- CONFIGURAÇÕES ---
 const API_KEY_BRAPI = "hshuPrGV3kvLM6Yh8FEDrD";
