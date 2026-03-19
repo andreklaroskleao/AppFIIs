@@ -234,27 +234,23 @@ window.perguntarIA = async () => {
     for (const modelo of modelos) {
         try {
             const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-                method: "POST",
-                                   headers: {
-                        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
-                        "Content-Type": "application/json",
-                        "HTTP-Referer": window.location.origin,
-                        "X-Title": "FII Insight"
-                    }
-                body: JSON.stringify({
-                    model: modelo,
-                    messages: [
-                        {
-                            role: "system",
-                            content: "Você é um analista profissional de FIIs, direto, crítico e objetivo."
-                        },
-                        {
-                            role: "user",
-                            content: `Carteira: ${JSON.stringify(contextoCarteira)}. Pergunta: ${pergunta}`
-                        }
-                    ]
-                })
-            });
+    method: "POST",
+    headers: {
+        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": window.location.origin,
+        "X-Title": "FII Insight"
+    },
+    body: JSON.stringify({
+        model: "mistralai/mistral-7b-instruct:free",
+        messages: [
+            {
+                role: "user",
+                content: "Teste"
+            }
+        ]
+    })
+});
 
             const data = await res.json();
 
