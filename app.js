@@ -66,22 +66,41 @@ window.carregarDados = () => {
             }
 
             html += `
-                <tr class="hover:bg-slate-800/30">
-                    <td data-label="Ativo" class="p-4 font-black text-emerald-400">${f.ticker} <span class="block text-[8px] text-slate-600">${f.segmento}</span></td>
-                    <td data-label="Preço/Teto" class="p-4 text-xs">
-                        <div class="text-white font-bold">R$ ${f.preco.toFixed(2)}</div>
-                        <div class="text-[9px] text-slate-500">Teto: R$ ${teto.toFixed(2)}</div>
-                    </td>
-                    <td data-label="Peso" class="p-4">
-                        <div class="w-full bg-slate-900 h-1 rounded-full"><div class="bg-blue-600 h-full" style="width:${(pReal*100)}%"></div></div>
-                        <span class="text-[8px] text-slate-500 uppercase mt-1">Real: ${(pReal*100).toFixed(1)}% / Alvo: ${(pIdeal*100).toFixed(1)}%</span>
-                    </td>
-                    <td data-label="Total" class="p-4 text-right font-black text-xs">R$ ${f.total.toFixed(2)}</td>
-                    <td class="p-4 flex gap-2 justify-center">
-                        <button onclick="window.prepararEdicao('${f.id}')" class="text-blue-500 text-[9px] uppercase font-bold">Editar</button>
-                        <button onclick="window.deletarAtivo('${f.id}')" class="text-slate-700 hover:text-red-500">✕</button>
-                    </td>
-                </tr>`;
+    <tr class="hover:bg-slate-800/30 transition">
+        <td data-label="Ativo" class="p-4">
+            <div class="flex flex-col">
+                <span class="font-black text-emerald-400 text-sm">${f.ticker}</span>
+                <span class="text-[9px] text-slate-600 uppercase font-bold">${f.segmento || 'FII'}</span>
+            </div>
+        </td>
+        <td data-label="Preço / Teto" class="p-4 px-6"> <div class="flex flex-col">
+                <span class="font-bold text-white text-xs">R$ ${f.preco.toFixed(2)}</span>
+                <span class="text-[9px] text-slate-500 italic">Teto: R$ ${f.precoTeto.toFixed(2)}</span>
+            </div>
+        </td>
+        <td data-label="Alocação" class="p-4 px-6">
+            <div class="w-full max-w-[120px]">
+                <div class="flex justify-between text-[8px] font-black text-slate-500 mb-1">
+                    <span>${(pReal*100).toFixed(1)}%</span>
+                    <span>Alvo: ${(pIdeal*100).toFixed(1)}%</span>
+                </div>
+                <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+                    <div class="bg-blue-600 h-full" style="width:${(pReal*100)}%"></div>
+                </div>
+            </div>
+        </td>
+        <td data-label="Posição Total" class="p-4 px-10 text-right"> <div class="flex flex-col">
+                <span class="font-black text-white text-sm">R$ ${f.total.toFixed(2)}</span>
+                <span class="text-[9px] text-slate-500 font-bold uppercase">${f.quantidade} COTAS</span>
+            </div>
+        </td>
+        <td class="p-4 text-center">
+            <div class="flex gap-4 justify-center">
+                <button onclick="window.prepararEdicao('${f.id}')" class="text-blue-500 hover:text-blue-300 font-black text-[10px] uppercase">EDITAR</button>
+                <button onclick="window.deletarAtivo('${f.id}')" class="text-slate-700 hover:text-red-500 font-black text-[10px]">✕</button>
+            </div>
+        </td>
+    </tr>`;
         });
 
         document.getElementById('tabela-corpo').innerHTML = html;
