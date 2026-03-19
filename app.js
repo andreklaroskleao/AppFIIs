@@ -1,5 +1,6 @@
 import { db, auth, provider, signInWithPopup, signOut } from './firebase-config.js';
 import { collection, addDoc, query, where, onSnapshot, doc, deleteDoc, updateDoc, getDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
 
 const API_KEY = "hshuPrGV3kvLM6Yh8FEDrD";
 let usuarioAtual = null;
@@ -177,35 +178,65 @@ window.carregarDados = () => {
     });
 };
 
-// --- IA ANALÍTICA REAL (BASEADA NOS DADOS DO BANCO) ---
-window.perguntarIA = () => {
-    const pergunta = document.getElementById('pergunta-ia').value.toLowerCase();
+// CONFIGURAÇÃO GEMINI AI
+const GEMINI_API_KEY = "AIzaSyDrEtdPXFXydgQcb5LEiyS9re7S3PhzUw8"; // <--- COLOQUE SUA CHAVE AQUI
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+
+window.perguntarIA = async () => {
+    const pergunta = document.getElementById('pergunta-ia').value;
     const chat = document.getElementById('chat-ia-respostas');
     
-    // Motor de análise real
-    const ativosAbaixoTeto = dadosAtuaisParaIA.filter(a => a.preco <= (a.precoTeto || 0));
-    const maiorPosicao = [...dadosAtuaisParaIA].sort((a,b) => b.total - a.total)[0];
-    const setorForte = dadosAtuaisParaIA.reduce((acc, a) => { acc[a.segmento] = (acc[a.segmento] || 0) + a.total; return acc; }, {});
+    if (!pergunta) return;
 
-    let resposta = "";
+    // 1. Criamos o "Contexto da Carteira" para enviar ao Gemini
+    const contextoCarteira = dadosAtuaisParaIA.map(a => ({
+        ticker: a.ticker,
+        segmento: a.segmento,
+        quantidade: a.quantidade,
+        precoAtual: a.preco,
+        precoTeto: a.precoTeto,
+        rendimentoEstimado: (a.quantidade * a.divEstimado).toFixed(2),
+        dataCom: a.dataCom
+    }));
 
-    if (pergunta.includes("comprar") || pergunta.includes("aporte")) {
-        resposta = ativosAbaixoTeto.length > 0 ? 
-            `Análise técnica: Os ativos ${ativosAbaixoTeto.map(a => a.ticker).join(', ')} estão abaixo do seu preço teto. Priorize os de maior nota para equilibrar o risco.` :
-            "No momento, todos os seus ativos estão acima do preço teto. Recomendo aguardar uma correção ou buscar novas oportunidades.";
-    } else if (pergunta.includes("risco") || pergunta.includes("perigoso")) {
-        resposta = `Seu maior risco de concentração hoje é o ativo ${maiorPosicao?.ticker}, que representa uma fatia relevante do seu capital. Verifique se o setor de ${maiorPosicao?.segmento} não está saturado na sua carteira.`;
-    } else if (pergunta.includes("renda") || pergunta.includes("quanto")) {
-        const total = dadosAtuaisParaIA.reduce((acc, a) => acc + (a.quantidade * a.divEstimado), 0);
-        resposta = `Sua renda mensal estimada é de R$ ${total.toFixed(2)}. Mantendo o reinvestimento, sua renda por hora deve subir 12% nos próximos meses.`;
-    } else {
-        resposta = "Interessante. Analisando sua estratégia de FIIs, notei que você tem uma boa diversificação. Deseja que eu analise um ticker específico ou sugira um rebalanceamento de caixa?";
+    const totalPatrimonio = dadosAtuaisParaIA.reduce((acc, curr) => acc + curr.total, 0);
+
+    // Adiciona feedback visual de carregando
+    chat.innerHTML += `<div class='mb-2 p-2 bg-slate-800/40 rounded-lg text-[10px]'><span class='text-slate-500 font-bold'>VOCÊ:</span> ${pergunta}</div>`;
+    const tempDiv = document.createElement("div");
+    tempDiv.className = "mb-4 p-2 border-l-2 border-purple-500 bg-purple-500/5 text-purple-200 text-[10px]";
+    tempDiv.innerHTML = "<span class='animate-pulse'>Alpha IA está analisando sua carteira...</span>";
+    chat.appendChild(tempDiv);
+    chat.scrollTop = chat.scrollHeight;
+
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+        // O "System Prompt" que molda a personalidade da IA
+        const promptGeral = `
+            Você é o Alpha Insight, um consultor sênior especializado em Fundos Imobiliários (FIIs) e FIAGROs.
+            Dados da Carteira do Usuário:
+            - Patrimônio Total: R$ ${totalPatrimonio.toFixed(2)}
+            - Ativos: ${JSON.stringify(contextoCarteira)}
+            
+            Sua tarefa: Responda de forma curta, técnica e precisa (máximo 3 parágrafos). 
+            Use termos de mercado (Yield on Cost, P/VP, Vacância, Data Com).
+            Se o usuário perguntar o que comprar, analise quais ativos estão abaixo do preço teto no contexto fornecido.
+            Seja crítico se houver muita concentração em um único ativo ou setor.
+            Pergunta do usuário: ${pergunta}
+        `;
+
+        const result = await model.generateContent(promptGeral);
+        const response = await result.response;
+        const textoIA = response.text();
+
+        // Substitui o "Carregando" pela resposta real
+        tempDiv.innerHTML = `<span class='text-purple-400 font-black'>ALPHA IA (Gemini):</span> ${textoIA}`;
+    } catch (error) {
+        tempDiv.innerHTML = `<span class='text-red-400 font-black'>ERRO:</span> Não foi possível conectar ao Gemini. Verifique sua API Key.`;
+        console.error(error);
     }
 
-    chat.innerHTML += `
-        <div class='mb-2 p-2 bg-slate-800/40 rounded-lg text-[10px]'><span class='text-slate-500'>VOCÊ:</span> ${pergunta}</div>
-        <div class='mb-4 p-2 border-l-2 border-purple-500 bg-purple-500/5 text-purple-200 text-[10px]'><span class='text-purple-400 font-black'>ALPHA IA:</span> ${resposta}</div>
-    `;
     document.getElementById('pergunta-ia').value = "";
     chat.scrollTop = chat.scrollHeight;
 };
