@@ -51,34 +51,33 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
-                <div class="xl:col-span-1 glass p-6 rounded-2xl h-fit">
-                    <h3 class="font-bold mb-4 text-xs uppercase text-emerald-400 tracking-widest">Novo Aporte</h3>
-                    <div class="space-y-3">
-                        <input type="text" id="ticker-input" placeholder="Ticker (ex: KNRI11)" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm focus:border-emerald-500 outline-none uppercase font-mono">
-                        <input type="number" id="qtd-input" placeholder="Quantidade" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm focus:border-emerald-500 outline-none">
-                        <input type="number" id="pm-input" placeholder="Preço Médio (R$)" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm focus:border-emerald-500 outline-none">
-                        <button onclick="window.adicionarFundo()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg transition-all text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/20">Registrar Ativo</button>
-                    </div>
-                    <div class="mt-8 relative h-48 w-full">
-                        <canvas id="chartDistribuicao"></canvas>
-                    </div>
-                </div>
-
-                <div class="xl:col-span-3 glass rounded-2xl overflow-hidden shadow-2xl">
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-[11px] md:text-xs">
-                            <thead class="bg-slate-900 text-slate-400 uppercase text-[10px]">
-                                    <tr>
-                                        <th class="p-4">Ativo</th>
-                                        <th class="p-4">Cotação</th>
-                                        <th class="p-4 text-center">Indicadores</th> <th class="p-4">P. Médio</th>
-                                        <th class="p-4">Qtd</th>
-                                        <th class="p-4">Total</th>
-                                        <th class="p-4 text-center text-blue-400">Calendário</th> <th class="p-4">Resultado</th>
-                                        <th class="p-4 text-center">Ação</th>
-                                    </tr>
-                                </thead>
+            <div class="lg:col-span-1 glass p-6 rounded-2xl h-fit">
+                                <h3 class="text-xs font-black uppercase text-emerald-400 mb-4 tracking-widest">Novo Aporte / Ativo</h3>
+                                <input type="text" id="ticker-input" placeholder="TICKER" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-2 uppercase font-bold text-white">
+                                <div class="grid grid-cols-2 gap-2 mb-2">
+                                    <input type="number" id="qtd-input" placeholder="QTD" class="bg-slate-900 border border-slate-700 rounded p-3">
+                                    <input type="number" id="pm-input" placeholder="P. MÉDIO" class="bg-slate-900 border border-slate-700 rounded p-3">
+                                </div>
+                                <div class="grid grid-cols-2 gap-2 mb-4">
+                                    <input type="number" id="nota-input" placeholder="NOTA (1-10)" class="bg-slate-900 border border-slate-700 rounded p-3">
+                                    <input type="number" id="teto-input" placeholder="P. TETO" class="bg-slate-900 border border-slate-700 rounded p-3">
+                                </div>
+                                <button onclick="window.adicionarFundo()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded uppercase text-xs transition-all shadow-lg shadow-emerald-900/20">Registrar Ativo</button>
+                                <div class="mt-6 h-48"><canvas id="chartDistribuicao"></canvas></div>
+                            </div>
+                            
+                            <thead class="bg-slate-900 text-slate-400 uppercase text-[9px] tracking-widest">
+                                <tr>
+                                    <th class="p-4">Ativo</th>
+                                    <th class="p-4">Preço / Teto</th>
+                                    <th class="p-4">Nota</th>
+                                    <th class="p-4">Ideal vs Atual</th>
+                                    <th class="p-4">Qtd</th>
+                                    <th class="p-4">Total</th>
+                                    <th class="p-4 text-center">Status</th>
+                                    <th class="p-4">Ação</th>
+                                </tr>
+                            </thead>
                             <tbody id="tabela-corpo" class="divide-y divide-slate-800/50">
                                 </tbody>
                         </table>
