@@ -22,8 +22,6 @@ import {
     serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
-// --- CONFIGURAÇÕES ---
-// Em produção, mova a chamada da BRAPI para um backend/serverless.
 const API_KEY_BRAPI = 'hshuPrGV3kvLM6Yh8FEDrD';
 const BRAPI_BATCH_SIZE = 20;
 
@@ -72,25 +70,25 @@ const camposProvento = {
     data: document.getElementById('prov-data')
 };
 
-function escapeHtml(valor = '') {
-    return String(valor)
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;');
+function escapeHtml(valor) {
+    return String(valor || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
-function formatarMoeda(valor = 0, casas = 2) {
+function formatarMoeda(valor, casas) {
     return Number(valor || 0).toLocaleString('pt-BR', {
-        minimumFractionDigits: casas,
-        maximumFractionDigits: casas
+        minimumFractionDigits: typeof casas === 'number' ? casas : 2,
+        maximumFractionDigits: typeof casas === 'number' ? casas : 2
     });
 }
 
-function numeroSeguro(valor, fallback = 0) {
+function numeroSeguro(valor, fallback) {
     const numero = Number(valor);
-    return Number.isFinite(numero) ? numero : fallback;
+    return Number.isFinite(numero) ? numero : (typeof fallback === 'number' ? fallback : 0);
 }
 
 function normalizarTicker(valor) {
@@ -114,34 +112,35 @@ function distanciaCircularDias(diaA, diaB) {
 
 function atualizarEstadoLogin(logado) {
     if (logado) {
-        elementos.infoUser.innerHTML = `
-            <button id="btn-logout" type="button" class="text-[10px] font-black text-red-500 uppercase px-4 py-2 border border-red-500/20 rounded-xl hover:bg-red-500/10 transition">
-                Sair
-            </button>`;
+        elementos.infoUser.innerHTML =
+            '<button id="btn-logout" type="button" class="text-[10px] font-black text-red-500 uppercase px-4 py-2 border border-red-500/20 rounded-xl hover:bg-red-500/10 transition">' +
+            'Sair' +
+            '</button>';
 
-        document.getElementById('btn-logout').addEventListener('click', async () => {
+        document.getElementById('btn-logout').addEventListener('click', async function () {
             try {
                 await signOut(auth);
             } catch (erro) {
-                alert(\`Erro ao sair: \${erro.message}\`);
+                alert('Erro ao sair: ' + erro.message);
             }
         });
 
-        elementos.tabelaCorpo.innerHTML = '<tr><td colspan="6" class="p-10 text-center text-emerald-500 italic animate-pulse">Carregando cotações e ativos...</td></tr>';
+        elementos.tabelaCorpo.innerHTML =
+            '<tr><td colspan="6" class="p-10 text-center text-emerald-500 italic animate-pulse">Carregando cotações e ativos...</td></tr>';
         return;
     }
 
-    elementos.infoUser.innerHTML = `
-        <button id="btn-login" type="button" class="bg-emerald-600 px-6 py-2 rounded-xl font-black text-[11px] uppercase shadow-lg shadow-emerald-900/20 hover:bg-emerald-500 transition">
-            Login Google
-        </button>`;
+    elementos.infoUser.innerHTML =
+        '<button id="btn-login" type="button" class="bg-emerald-600 px-6 py-2 rounded-xl font-black text-[11px] uppercase shadow-lg shadow-emerald-900/20 hover:bg-emerald-500 transition">' +
+        'Login Google' +
+        '</button>';
 
-    document.getElementById('btn-login').addEventListener('click', async () => {
+    document.getElementById('btn-login').addEventListener('click', async function () {
         try {
             await setPersistence(auth, browserLocalPersistence);
             await signInWithPopup(auth, provider);
         } catch (erro) {
-            alert(\`Erro no login: \${erro.message}\`);
+            alert('Erro no login: ' + erro.message);
         }
     });
 }
@@ -177,7 +176,17 @@ function resetarDashboard() {
 async function fetchBrapiBatch(tickersArray) {
     if (!Array.isArray(tickersArray) || tickersArray.length === 0) return {};
 
-    const tickers = [...new Set(tickersArray.map(normalizarTicker).filter(Boolean))];
+    const tickers = [];
+    const vistos = {};
+
+    tickersArray.forEach(function (item) {
+        const ticker = normalizarTicker(item);
+        if (ticker && !vistos[ticker]) {
+            vistos[ticker] = true;
+            tickers.push(ticker);
+        }
+    });
+
     const precos = {};
 
     for (let indice = 0; indice < tickers.length; indice += BRAPI_BATCH_SIZE) {
@@ -185,16 +194,17 @@ async function fetchBrapiBatch(tickersArray) {
         const simbolos = encodeURIComponent(lote.join(','));
 
         try {
-            const resposta = await fetch(\`https://brapi.dev/api/quote/\${simbolos}?token=\${API_KEY_BRAPI}\`);
+            const resposta = await fetch('https://brapi.dev/api/quote/' + simbolos + '?token=' + API_KEY_BRAPI);
 
             if (!resposta.ok) {
-                throw new Error(\`HTTP \${resposta.status}\`);
+                throw new Error('HTTP ' + resposta.status);
             }
 
             const data = await resposta.json();
+
             if (Array.isArray(data.results)) {
-                data.results.forEach((ativo) => {
-                    if (ativo?.symbol) {
+                data.results.forEach(function (ativo) {
+                    if (ativo && ativo.symbol) {
                         precos[ativo.symbol] = ativo;
                     }
                 });
@@ -208,7 +218,7 @@ async function fetchBrapiBatch(tickersArray) {
 }
 
 function enriquecerAtivos(ativosRaw, dadosMercado) {
-    return ativosRaw.map((item) => {
+    return ativosRaw.map(function (item) {
         const ticker = normalizarTicker(item.ticker);
         const api = dadosMercado[ticker] || {};
         const preco = numeroSeguro(api.regularMarketPrice, 0);
@@ -218,17 +228,18 @@ function enriquecerAtivos(ativosRaw, dadosMercado) {
         const divEstimado = dy > 0 ? (preco * (dy / 100)) / 12 : preco * 0.008;
 
         return {
-            ...item,
-            ticker,
-            quantidade,
-            precoMedio,
+            id: item.id,
+            uid: item.uid,
+            ticker: ticker,
+            quantidade: quantidade,
+            precoMedio: precoMedio,
             nota: numeroSeguro(item.nota, 0),
             precoTeto: numeroSeguro(item.precoTeto, 0),
             dataCom: diaValido(item.dataCom),
             dataPg: diaValido(item.dataPg),
             segmento: item.segmento || 'Outros',
-            preco,
-            divEstimado,
+            preco: preco,
+            divEstimado: divEstimado,
             total: preco * quantidade,
             inv: precoMedio * quantidade
         };
@@ -238,7 +249,9 @@ function enriquecerAtivos(ativosRaw, dadosMercado) {
 function renderizarTabela() {
     const ativosFiltrados = filtroAtivo === 'Todos'
         ? ativosCache
-        : ativosCache.filter((ativo) => ativo.segmento === filtroAtivo);
+        : ativosCache.filter(function (ativo) {
+            return ativo.segmento === filtroAtivo;
+        });
 
     const caixa = numeroSeguro(elementos.caixaDisp.value, 0);
     const diaAtual = new Date().getDate();
@@ -249,13 +262,13 @@ function renderizarTabela() {
     let projecaoMes = 0;
     const sugestoes = [];
 
-    ativosFiltrados.forEach((ativo) => {
+    ativosFiltrados.forEach(function (ativo) {
         patrimonio += ativo.total;
         somaNotas += ativo.nota;
         custoTotal += ativo.inv;
     });
 
-    const linhas = ativosFiltrados.map((ativo) => {
+    const linhas = ativosFiltrados.map(function (ativo) {
         const pesoIdeal = somaNotas > 0 ? ativo.nota / somaNotas : 0;
         const pesoReal = patrimonio > 0 ? ativo.total / patrimonio : 0;
         const rendimentoAproximado = ativo.quantidade * ativo.divEstimado;
@@ -276,85 +289,88 @@ function renderizarTabela() {
             }
         }
 
-        return `
-            <tr class="hover:bg-slate-800/40 border-b border-slate-800/50 transition-colors">
-                <td class="p-4">
-                    <div class="flex flex-col">
-                        <div class="flex items-center gap-2">
-                            <span class="font-black text-emerald-400 text-sm tracking-tighter">${escapeHtml(ativo.ticker)}</span>
-                            ${isDataComPerto ? '<span class="badge-com">DATA COM</span>' : ''}
-                        </div>
-                        <span class="text-[9px] text-slate-500 uppercase font-black">${escapeHtml(ativo.segmento || 'FII / OUTRO')}</span>
-                    </div>
-                </td>
-                <td class="p-4 text-center">
-                    <div class="flex flex-col">
-                        <span class="text-[8px] text-slate-500 font-bold uppercase">Preço / Teto</span>
-                        <span class="font-bold text-white text-xs val-sensivel">
-                            ${ativo.preco > 0 ? `R$ ${formatarMoeda(ativo.preco)}` : '<span class="text-red-500 text-[10px]">API OFF</span>'}
-                        </span>
-                        <span class="text-[10px] ${(ativo.preco || 0) > (ativo.precoTeto || 0) ? 'text-red-500' : 'text-emerald-500'} font-black">
-                            Teto: R$ ${formatarMoeda(ativo.precoTeto)}
-                        </span>
-                    </div>
-                </td>
-                <td class="p-4 text-center">
-                    <div class="flex flex-col items-center">
-                        <span class="text-[8px] text-slate-500 font-bold uppercase mb-1">Agenda</span>
-                        <div class="flex gap-2">
-                            <div class="bg-slate-900 px-2 py-1 rounded border border-white/5 min-w-[35px]">
-                                <span class="text-[7px] text-blue-400 font-black block text-center">COM</span>
-                                <span class="text-white text-[10px] font-bold block text-center">${ativo.dataCom ?? '--'}</span>
-                            </div>
-                            <div class="bg-slate-900 px-2 py-1 rounded border border-white/5 min-w-[35px]">
-                                <span class="text-[7px] text-emerald-400 font-black block text-center">PAGO</span>
-                                <span class="text-white text-[10px] font-bold block text-center">${ativo.dataPg ?? '--'}</span>
-                            </div>
-                        </div>
-                    </div>
-                </td>
-                <td class="p-4">
-                    <div class="w-full min-w-[150px]">
-                        <div class="flex justify-between text-[8px] font-black text-slate-500 mb-1 uppercase gap-3">
-                            <span class="text-blue-400">${(pesoReal * 100).toFixed(1)}% Real / ${(pesoIdeal * 100).toFixed(1)}% Alvo</span>
-                            <span class="text-purple-400">R$ ${formatarMoeda(rendimentoAproximado)} Est.</span>
-                        </div>
-                        <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-white/5">
-                            <div class="bg-blue-600 h-full" style="width:${larguraBarra}%"></div>
-                        </div>
-                    </div>
-                </td>
-                <td class="p-4 text-right">
-                    <div class="flex flex-col items-end">
-                        <span class="font-black text-white text-sm mono val-sensivel">R$ ${formatarMoeda(ativo.total)}</span>
-                        <span class="text-[9px] text-slate-500 font-bold uppercase">${formatarMoeda(ativo.quantidade, 0)} COTAS</span>
-                    </div>
-                </td>
-                <td class="p-4 text-center">
-                    <div class="flex gap-2 justify-center">
-                        <button data-id="${escapeHtml(ativo.id)}" type="button" class="btn-editar bg-slate-800 p-2 rounded-lg hover:text-blue-400 transition" aria-label="Editar ${escapeHtml(ativo.ticker)}">📝</button>
-                        <button data-id="${escapeHtml(ativo.id)}" type="button" class="btn-deletar bg-slate-800 p-2 rounded-lg hover:text-red-500 transition" aria-label="Excluir ${escapeHtml(ativo.ticker)}">✕</button>
-                    </div>
-                </td>
-            </tr>`;
+        const precoHtml = ativo.preco > 0
+            ? 'R$ ' + formatarMoeda(ativo.preco)
+            : '<span class="text-red-500 text-[10px]">API OFF</span>';
+
+        const classeTeto = (ativo.preco || 0) > (ativo.precoTeto || 0) ? 'text-red-500' : 'text-emerald-500';
+
+        return ''
+            + '<tr class="hover:bg-slate-800/40 border-b border-slate-800/50 transition-colors">'
+            + '  <td class="p-4">'
+            + '    <div class="flex flex-col">'
+            + '      <div class="flex items-center gap-2">'
+            + '        <span class="font-black text-emerald-400 text-sm tracking-tighter">' + escapeHtml(ativo.ticker) + '</span>'
+            +          (isDataComPerto ? '<span class="badge-com">DATA COM</span>' : '')
+            + '      </div>'
+            + '      <span class="text-[9px] text-slate-500 uppercase font-black">' + escapeHtml(ativo.segmento || 'FII / OUTRO') + '</span>'
+            + '    </div>'
+            + '  </td>'
+            + '  <td class="p-4 text-center">'
+            + '    <div class="flex flex-col">'
+            + '      <span class="text-[8px] text-slate-500 font-bold uppercase">Preço / Teto</span>'
+            + '      <span class="font-bold text-white text-xs val-sensivel">' + precoHtml + '</span>'
+            + '      <span class="text-[10px] ' + classeTeto + ' font-black">Teto: R$ ' + formatarMoeda(ativo.precoTeto) + '</span>'
+            + '    </div>'
+            + '  </td>'
+            + '  <td class="p-4 text-center">'
+            + '    <div class="flex flex-col items-center">'
+            + '      <span class="text-[8px] text-slate-500 font-bold uppercase mb-1">Agenda</span>'
+            + '      <div class="flex gap-2">'
+            + '        <div class="bg-slate-900 px-2 py-1 rounded border border-white/5 min-w-[35px]">'
+            + '          <span class="text-[7px] text-blue-400 font-black block text-center">COM</span>'
+            + '          <span class="text-white text-[10px] font-bold block text-center">' + (ativo.dataCom == null ? '--' : ativo.dataCom) + '</span>'
+            + '        </div>'
+            + '        <div class="bg-slate-900 px-2 py-1 rounded border border-white/5 min-w-[35px]">'
+            + '          <span class="text-[7px] text-emerald-400 font-black block text-center">PAGO</span>'
+            + '          <span class="text-white text-[10px] font-bold block text-center">' + (ativo.dataPg == null ? '--' : ativo.dataPg) + '</span>'
+            + '        </div>'
+            + '      </div>'
+            + '    </div>'
+            + '  </td>'
+            + '  <td class="p-4">'
+            + '    <div class="w-full min-w-[150px]">'
+            + '      <div class="flex justify-between text-[8px] font-black text-slate-500 mb-1 uppercase gap-3">'
+            + '        <span class="text-blue-400">' + (pesoReal * 100).toFixed(1) + '% Real / ' + (pesoIdeal * 100).toFixed(1) + '% Alvo</span>'
+            + '        <span class="text-purple-400">R$ ' + formatarMoeda(rendimentoAproximado) + ' Est.</span>'
+            + '      </div>'
+            + '      <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-white/5">'
+            + '        <div class="bg-blue-600 h-full" style="width:' + larguraBarra + '%"></div>'
+            + '      </div>'
+            + '    </div>'
+            + '  </td>'
+            + '  <td class="p-4 text-right">'
+            + '    <div class="flex flex-col items-end">'
+            + '      <span class="font-black text-white text-sm mono val-sensivel">R$ ' + formatarMoeda(ativo.total) + '</span>'
+            + '      <span class="text-[9px] text-slate-500 font-bold uppercase">' + formatarMoeda(ativo.quantidade, 0) + ' COTAS</span>'
+            + '    </div>'
+            + '  </td>'
+            + '  <td class="p-4 text-center">'
+            + '    <div class="flex gap-2 justify-center">'
+            + '      <button data-id="' + escapeHtml(ativo.id) + '" type="button" class="btn-editar bg-slate-800 p-2 rounded-lg hover:text-blue-400 transition" aria-label="Editar ' + escapeHtml(ativo.ticker) + '">📝</button>'
+            + '      <button data-id="' + escapeHtml(ativo.id) + '" type="button" class="btn-deletar bg-slate-800 p-2 rounded-lg hover:text-red-500 transition" aria-label="Excluir ' + escapeHtml(ativo.ticker) + '">✕</button>'
+            + '    </div>'
+            + '  </td>'
+            + '</tr>';
     });
 
     elementos.tabelaCorpo.innerHTML = linhas.join('') || '<tr><td colspan="6" class="p-10 text-center text-slate-500 italic">Nenhum ativo corresponde aos filtros.</td></tr>';
-    elementos.totalPatrimonio.textContent = `R$ ${formatarMoeda(patrimonio)}`;
-    elementos.rendaMes.textContent = `R$ ${formatarMoeda(projecaoMes)}`;
-    elementos.rendaHora.textContent = `R$ ${formatarMoeda(projecaoMes / 720, 4)} / hora`;
-    elementos.yocMedio.textContent = custoTotal > 0 ? `${((projecaoMes * 12 / custoTotal) * 100).toFixed(2)}%` : '0.00%';
-    elementos.quedaPat.textContent = `- R$ ${formatarMoeda(patrimonio * 0.05)} (Stress 5%)`;
+    elementos.totalPatrimonio.textContent = 'R$ ' + formatarMoeda(patrimonio);
+    elementos.rendaMes.textContent = 'R$ ' + formatarMoeda(projecaoMes);
+    elementos.rendaHora.textContent = 'R$ ' + formatarMoeda(projecaoMes / 720, 4) + ' / hora';
+    elementos.yocMedio.textContent = custoTotal > 0 ? (((projecaoMes * 12 / custoTotal) * 100).toFixed(2) + '%') : '0.00%';
+    elementos.quedaPat.textContent = '- R$ ' + formatarMoeda(patrimonio * 0.05);
 
     elementos.painelAportes.innerHTML = sugestoes
-        .sort((a, b) => b.nota - a.nota)
+        .sort(function (a, b) { return b.nota - a.nota; })
         .slice(0, 2)
-        .map((sugestao) => `
-            <div class="bg-slate-900/60 p-4 rounded-2xl border border-blue-900/30">
-                <div class="text-[8px] text-blue-400 font-black mb-1 uppercase tracking-widest">Rebalancear</div>
-                <div class="text-lg font-black text-white">${escapeHtml(sugestao.ticker)} <span class="text-emerald-500">+${sugestao.qtd} un.</span></div>
-            </div>
-        `)
+        .map(function (sugestao) {
+            return ''
+                + '<div class="bg-slate-900/60 p-4 rounded-2xl border border-blue-900/30">'
+                + '  <div class="text-[8px] text-blue-400 font-black mb-1 uppercase tracking-widest">Rebalancear</div>'
+                + '  <div class="text-lg font-black text-white">' + escapeHtml(sugestao.ticker) + ' <span class="text-emerald-500">+' + sugestao.qtd + ' un.</span></div>'
+                + '</div>';
+        })
         .join('') || '<p class="text-[10px] italic p-4 text-slate-600">Alocação equilibrada.</p>';
 }
 
@@ -367,17 +383,30 @@ function assinarAtivos() {
 
     const consulta = query(collection(db, 'ativos'), where('uid', '==', usuarioAtual.uid));
 
-    unsubscribeAtivos = onSnapshot(consulta, async (snapshot) => {
-        const ativosRaw = snapshot.docs.map((documento) => ({
-            id: documento.id,
-            ...documento.data()
-        }));
+    unsubscribeAtivos = onSnapshot(consulta, async function (snapshot) {
+        const ativosRaw = snapshot.docs.map(function (documento) {
+            return {
+                id: documento.id,
+                uid: documento.data().uid,
+                ticker: documento.data().ticker,
+                quantidade: documento.data().quantidade,
+                precoMedio: documento.data().precoMedio,
+                nota: documento.data().nota,
+                precoTeto: documento.data().precoTeto,
+                dataCom: documento.data().dataCom,
+                dataPg: documento.data().dataPg,
+                segmento: documento.data().segmento
+            };
+        });
 
-        const tickers = ativosRaw.map((ativo) => ativo.ticker);
+        const tickers = ativosRaw.map(function (ativo) {
+            return ativo.ticker;
+        });
+
         const dadosMercado = await fetchBrapiBatch(tickers);
         ativosCache = enriquecerAtivos(ativosRaw, dadosMercado);
         renderizarTabela();
-    }, (erro) => {
+    }, function (erro) {
         console.error('Erro ao escutar ativos:', erro);
         elementos.tabelaCorpo.innerHTML = '<tr><td colspan="6" class="p-10 text-center text-red-500 italic">Erro ao carregar ativos.</td></tr>';
     });
@@ -392,24 +421,30 @@ function assinarProventos() {
 
     const consulta = query(collection(db, 'proventos'), where('uid', '==', usuarioAtual.uid));
 
-    unsubscribeProventos = onSnapshot(consulta, (snapshot) => {
+    unsubscribeProventos = onSnapshot(consulta, function (snapshot) {
         const agrupado = {};
 
-        snapshot.forEach((documento) => {
+        snapshot.forEach(function (documento) {
             const dado = documento.data();
-            if (!dado?.mesAno) return;
+            if (!dado || !dado.mesAno) return;
             agrupado[dado.mesAno] = numeroSeguro(agrupado[dado.mesAno], 0) + numeroSeguro(dado.valor, 0);
         });
 
-        const mesesOrdenados = Object.keys(agrupado).sort((a, b) => a.localeCompare(b));
-        const labels = mesesOrdenados.map((mesAno) => {
-            const [ano, mes] = mesAno.split('-');
-            return `${mes}/${ano}`;
+        const mesesOrdenados = Object.keys(agrupado).sort(function (a, b) {
+            return a.localeCompare(b);
         });
-        const valores = mesesOrdenados.map((mesAno) => agrupado[mesAno]);
+
+        const labels = mesesOrdenados.map(function (mesAno) {
+            const partes = mesAno.split('-');
+            return partes[1] + '/' + partes[0];
+        });
+
+        const valores = mesesOrdenados.map(function (mesAno) {
+            return agrupado[mesAno];
+        });
 
         renderizarGrafico(labels, valores);
-    }, (erro) => {
+    }, function (erro) {
         console.error('Erro ao escutar proventos:', erro);
     });
 }
@@ -450,7 +485,9 @@ function renderizarGrafico(labels, data) {
                 legend: { display: false },
                 tooltip: {
                     callbacks: {
-                        label: (contexto) => `R$ ${formatarMoeda(contexto.raw)}`
+                        label: function (contexto) {
+                            return 'R$ ' + formatarMoeda(contexto.raw);
+                        }
                     }
                 }
             },
@@ -518,7 +555,7 @@ async function salvarAtivo() {
 
         cancelarEdicao();
     } catch (erro) {
-        alert(`Erro ao salvar: ${erro.message}`);
+        alert('Erro ao salvar: ' + erro.message);
     }
 }
 
@@ -542,7 +579,7 @@ async function prepararEdicao(id) {
         elementos.btnCancelar.classList.remove('hidden');
         elementos.formTitulo.innerHTML = '<span class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span> Editando Ativo';
     } catch (erro) {
-        alert(`Erro ao carregar ativo para edição: ${erro.message}`);
+        alert('Erro ao carregar ativo para edição: ' + erro.message);
     }
 }
 
@@ -552,9 +589,9 @@ function cancelarEdicao() {
     elementos.btnCancelar.classList.add('hidden');
     elementos.formTitulo.innerHTML = '<span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Gerenciar Ativo';
 
-    Object.values(camposAtivo).forEach((campo) => {
-        if ('value' in campo) {
-            campo.value = '';
+    Object.keys(camposAtivo).forEach(function (chave) {
+        if ('value' in camposAtivo[chave]) {
+            camposAtivo[chave].value = '';
         }
     });
 
@@ -579,9 +616,9 @@ async function registrarProvento() {
     try {
         await addDoc(collection(db, 'proventos'), {
             uid: usuarioAtual.uid,
-            ticker,
-            valor,
-            mesAno,
+            ticker: ticker,
+            valor: valor,
+            mesAno: mesAno,
             timestamp: serverTimestamp()
         });
 
@@ -590,30 +627,31 @@ async function registrarProvento() {
         camposProvento.data.value = '';
         alert('Provento registrado com sucesso!');
     } catch (erro) {
-        alert(`Erro ao registrar provento: ${erro.message}`);
+        alert('Erro ao registrar provento: ' + erro.message);
     }
 }
 
 function iniciarEventosUI() {
-    document.getElementById('btn-ghost').addEventListener('click', () => {
+    document.getElementById('btn-ghost').addEventListener('click', function () {
         isGhostMode = !isGhostMode;
         document.body.classList.toggle('ghost-mode', isGhostMode);
         document.getElementById('ghost-icon').innerText = isGhostMode ? '🙈' : '👁️';
     });
 
-    document.getElementById('container-filtros').addEventListener('click', (evento) => {
+    document.getElementById('container-filtros').addEventListener('click', function (evento) {
         const botao = evento.target.closest('.btn-filtro');
         if (!botao) return;
 
         filtroAtivo = botao.dataset.filtro;
-        document.querySelectorAll('.btn-filtro').forEach((item) => {
+
+        document.querySelectorAll('.btn-filtro').forEach(function (item) {
             item.classList.toggle('active', item.dataset.filtro === filtroAtivo);
         });
 
         renderizarTabela();
     });
 
-    document.getElementById('abas-nav').addEventListener('click', (evento) => {
+    document.getElementById('abas-nav').addEventListener('click', function (evento) {
         const botao = evento.target.closest('button[data-aba]');
         if (!botao) return;
 
@@ -621,7 +659,7 @@ function iniciarEventosUI() {
         elementos.secaoDash.classList.toggle('hidden', aba !== 'dash');
         elementos.secaoProventos.classList.toggle('hidden', aba !== 'proventos');
 
-        document.querySelectorAll('#abas-nav button').forEach((item) => {
+        document.querySelectorAll('#abas-nav button').forEach(function (item) {
             item.classList.toggle('text-white', item.dataset.aba === aba);
             item.classList.toggle('tab-active', item.dataset.aba === aba);
         });
@@ -632,7 +670,7 @@ function iniciarEventosUI() {
     elementos.btnCancelar.addEventListener('click', cancelarEdicao);
     elementos.btnRegistrarProvento.addEventListener('click', registrarProvento);
 
-    elementos.tabelaCorpo.addEventListener('click', async (evento) => {
+    elementos.tabelaCorpo.addEventListener('click', async function (evento) {
         const btnEditar = evento.target.closest('.btn-editar');
         const btnDeletar = evento.target.closest('.btn-deletar');
 
@@ -650,7 +688,7 @@ function iniciarEventosUI() {
                     cancelarEdicao();
                 }
             } catch (erro) {
-                alert(`Erro ao excluir: ${erro.message}`);
+                alert('Erro ao excluir: ' + erro.message);
             }
         }
     });
@@ -658,7 +696,7 @@ function iniciarEventosUI() {
 
 iniciarEventosUI();
 
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, function (user) {
     limparAssinaturas();
 
     if (user) {
