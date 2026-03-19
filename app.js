@@ -3,13 +3,17 @@ import { collection, addDoc, query, where, onSnapshot, doc, deleteDoc, updateDoc
 import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
 
 const API_KEY = "hshuPrGV3kvLM6Yh8FEDrD";
+const GEMINI_API_KEY = "AIzaSyDrEtdPXFXydgQcb5LEiyS9re7S3PhzUw8"; //
+
 let usuarioAtual = null;
 let idEdicaoAtiva = null;
 let filtroAtivo = "Todos";
 let isGhostMode = false;
 let dadosAtuaisParaIA = []; 
 
-// --- AUTH ---
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+
+// --- AUTENTICAÇÃO ---
 auth.onAuthStateChanged(user => {
     const info = document.getElementById('user-info');
     if (user) {
@@ -25,7 +29,7 @@ auth.onAuthStateChanged(user => {
 window.fazerLogin = () => signInWithPopup(auth, provider);
 window.fazerLogout = () => signOut(auth);
 
-// --- UI CONTROLS ---
+// --- CONTROLES DE UI ---
 window.toggleGhost = () => {
     isGhostMode = !isGhostMode;
     document.body.classList.toggle('ghost-mode', isGhostMode);
@@ -53,7 +57,7 @@ async function fetchBrapi(ticker) {
     } catch { return null; }
 }
 
-// --- ENGINE DE DADOS (CORREÇÃO DO TOFIXED) ---
+// --- ENGINE DE DADOS (CORREÇÃO DE UNDEFINED E TOFIXED) ---
 window.carregarDados = () => {
     if (!usuarioAtual) return;
     const q = query(collection(db, "ativos"), where("uid", "==", usuarioAtual.uid));
@@ -61,7 +65,7 @@ window.carregarDados = () => {
     onSnapshot(q, async (snap) => {
         let patTotal = 0; let somaNotas = 0; let custoTotal = 0;
         let projecaoMes = 0;
-        const caixa = parseFloat(document.getElementById('caixa-disponivel').value) || 0;
+        const caixa = parseFloat(document.getElementById('caixa-disponivel')?.value) || 0;
         const diaAtual = new Date().getDate();
 
         const ativosRaw = await Promise.all(snap.docs.map(async d => {
@@ -72,7 +76,8 @@ window.carregarDados = () => {
             const divEstimado = dy > 0 ? (preco * (dy / 100) / 12) : (preco * 0.008);
             
             return { 
-                id: d.id, ...i, 
+                id: d.id, 
+                ...i, 
                 preco: preco || 0, 
                 divEstimado: divEstimado || 0,
                 total: (preco || 0) * (i.quantidade || 0), 
@@ -92,13 +97,13 @@ window.carregarDados = () => {
             const rendAprox = (f.quantidade || 0) * f.divEstimado;
             projecaoMes += rendAprox;
 
-            if (pReal < pIdeal && (f.preco <= (f.precoTeto || 9999))) {
-                sug.push({ ticker: f.ticker, qtd: Math.floor(((patTotal + caixa) * pIdeal - f.total) / (f.preco || 1)), nota: f.nota });
+            // Sugestão de aporte apenas se preço for válido
+            if (pReal < pIdeal && f.preco > 0 && f.preco <= (f.precoTeto || 99999)) {
+                sug.push({ ticker: f.ticker, qtd: Math.floor(((patTotal + caixa) * pIdeal - f.total) / f.preco), nota: f.nota });
             }
 
             const isDataComPerto = f.dataCom && (Math.abs(f.dataCom - diaAtual) <= 3);
 
-            // TABELA COM TODAS AS INFORMAÇÕES EXPOSTAS
             html += `
                 <tr class="hover:bg-slate-800/40 border-b border-slate-800/50 transition-colors">
                     <td class="p-4">
@@ -123,12 +128,12 @@ window.carregarDados = () => {
                         <div class="flex flex-col items-center">
                             <span class="text-[8px] text-slate-500 font-bold uppercase mb-1">Agenda</span>
                             <div class="flex gap-2">
-                                <div class="bg-slate-900 px-2 py-1 rounded border border-white/5 flex flex-col items-center min-w-[35px]">
-                                    <span class="text-[7px] text-blue-400 font-black">COM</span>
+                                <div class="bg-slate-900 px-2 py-1 rounded border border-white/5 min-w-[35px]">
+                                    <span class="text-[7px] text-blue-400 font-black block">COM</span>
                                     <span class="text-white text-[10px] font-bold">${f.dataCom || '--'}</span>
                                 </div>
-                                <div class="bg-slate-900 px-2 py-1 rounded border border-white/5 flex flex-col items-center min-w-[35px]">
-                                    <span class="text-[7px] text-emerald-400 font-black">PAGO</span>
+                                <div class="bg-slate-900 px-2 py-1 rounded border border-white/5 min-w-[35px]">
+                                    <span class="text-[7px] text-emerald-400 font-black block">PAGO</span>
                                     <span class="text-white text-[10px] font-bold">${f.dataPg || '--'}</span>
                                 </div>
                             </div>
@@ -137,8 +142,8 @@ window.carregarDados = () => {
                     <td class="p-4">
                         <div class="w-full min-w-[120px]">
                             <div class="flex justify-between text-[8px] font-black text-slate-500 mb-1 uppercase">
-                                <span class="text-blue-400">${(pReal*100).toFixed(1)}% Real</span>
-                                <span class="text-purple-400">R$ ${rendAprox.toFixed(2)} Est.</span>
+                                <span class="text-blue-400">${(pReal*100).toFixed(1)}% Real / ${(pIdeal*100).toFixed(1)}% Alvo</span>
+                                <span class="text-purple-400">R$ ${rendAprox.toFixed(2)}</span>
                             </div>
                             <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-white/5">
                                 <div class="bg-blue-600 h-full" style="width:${(pReal*100)}%"></div>
@@ -147,9 +152,8 @@ window.carregarDados = () => {
                     </td>
                     <td class="p-4 text-right">
                         <div class="flex flex-col items-end">
-                            <span class="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">Total Posição</span>
                             <span class="font-black text-white text-sm mono val-sensivel">R$ ${f.total.toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
-                            <span class="text-[9px] text-slate-400 font-bold uppercase">${f.quantidade || 0} Cotas</span>
+                            <span class="text-[9px] text-slate-500 font-bold uppercase">${f.quantidade || 0} COTAS</span>
                         </div>
                     </td>
                     <td class="p-4 text-center">
@@ -161,7 +165,7 @@ window.carregarDados = () => {
                 </tr>`;
         });
 
-        document.getElementById('tabela-corpo').innerHTML = html;
+        document.getElementById('tabela-corpo').innerHTML = html || '<tr><td colspan="6" class="p-10 text-center text-slate-500 italic">Nenhum ativo encontrado.</td></tr>';
         document.getElementById('total-patrimonio').innerHTML = `R$ ${patTotal.toLocaleString('pt-BR', {minimumFractionDigits:2})}`;
         document.getElementById('renda-mes').innerHTML = `R$ ${projecaoMes.toLocaleString('pt-BR', {minimumFractionDigits:2})}`;
         document.getElementById('renda-hora').innerHTML = `R$ ${(projecaoMes/720).toLocaleString('pt-BR', {minimumFractionDigits:4})} / hora`;
@@ -171,37 +175,29 @@ window.carregarDados = () => {
         // Painel de Aportes
         document.getElementById('painel-aportes').innerHTML = sug.sort((a,b)=>b.nota-a.nota).slice(0,2).map(s => `
             <div class="bg-slate-900/60 p-4 rounded-2xl border border-blue-900/30">
-                <div class="text-[8px] text-blue-400 font-black mb-1 uppercase tracking-widest">Aporte Sugerido</div>
+                <div class="text-[8px] text-blue-400 font-black mb-1 uppercase tracking-widest">Aporte Alpha</div>
                 <div class="text-lg font-black text-white">${s.ticker} <span class="text-emerald-500">+${s.qtd} un.</span></div>
             </div>
-        `).join('') || '<p class="text-[10px] italic p-4 text-slate-600">Carteira em equilíbrio ou ativos acima do teto.</p>';
+        `).join('') || '<p class="text-[10px] italic p-4 text-slate-600">Sem sugestões no momento.</p>';
     });
 };
 
-// CONFIGURAÇÃO GEMINI AI
-const GEMINI_API_KEY = "AIzaSyDrEtdPXFXydgQcb5LEiyS9re7S3PhzUw8"; // <--- COLOQUE SUA CHAVE AQUI
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-
+// --- IA ANALÍTICA COM GEMINI (CORREÇÃO ERRO 404) ---
 window.perguntarIA = async () => {
     const pergunta = document.getElementById('pergunta-ia').value;
     const chat = document.getElementById('chat-ia-respostas');
     
     if (!pergunta) return;
 
-    // 1. Criamos o "Contexto da Carteira" para enviar ao Gemini
     const contextoCarteira = dadosAtuaisParaIA.map(a => ({
         ticker: a.ticker,
         segmento: a.segmento,
         quantidade: a.quantidade,
         precoAtual: a.preco,
         precoTeto: a.precoTeto,
-        rendimentoEstimado: (a.quantidade * a.divEstimado).toFixed(2),
-        dataCom: a.dataCom
+        rendimentoEstimado: (a.quantidade * a.divEstimado).toFixed(2)
     }));
 
-    const totalPatrimonio = dadosAtuaisParaIA.reduce((acc, curr) => acc + curr.total, 0);
-
-    // Adiciona feedback visual de carregando
     chat.innerHTML += `<div class='mb-2 p-2 bg-slate-800/40 rounded-lg text-[10px]'><span class='text-slate-500 font-bold'>VOCÊ:</span> ${pergunta}</div>`;
     const tempDiv = document.createElement("div");
     tempDiv.className = "mb-4 p-2 border-l-2 border-purple-500 bg-purple-500/5 text-purple-200 text-[10px]";
@@ -210,38 +206,31 @@ window.perguntarIA = async () => {
     chat.scrollTop = chat.scrollHeight;
 
     try {
+        // Correção do Modelo
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-        // O "System Prompt" que molda a personalidade da IA
         const promptGeral = `
-            Você é o Alpha Insight, um consultor sênior especializado em Fundos Imobiliários (FIIs) e FIAGROs.
-            Dados da Carteira do Usuário:
-            - Patrimônio Total: R$ ${totalPatrimonio.toFixed(2)}
-            - Ativos: ${JSON.stringify(contextoCarteira)}
+            Você é o Alpha Insight, consultor de FIIs.
+            Carteira: ${JSON.stringify(contextoCarteira)}
+            Total: R$ ${dadosAtuaisParaIA.reduce((a, b) => a + b.total, 0).toFixed(2)}
             
-            Sua tarefa: Responda de forma curta, técnica e precisa (máximo 3 parágrafos). 
-            Use termos de mercado (Yield on Cost, P/VP, Vacância, Data Com).
-            Se o usuário perguntar o que comprar, analise quais ativos estão abaixo do preço teto no contexto fornecido.
-            Seja crítico se houver muita concentração em um único ativo ou setor.
-            Pergunta do usuário: ${pergunta}
+            Responda de forma curta e técnica. Analise riscos de concentração e oportunidades abaixo do preço teto.
+            Pergunta: ${pergunta}
         `;
 
         const result = await model.generateContent(promptGeral);
         const response = await result.response;
-        const textoIA = response.text();
-
-        // Substitui o "Carregando" pela resposta real
-        tempDiv.innerHTML = `<span class='text-purple-400 font-black'>ALPHA IA (Gemini):</span> ${textoIA}`;
+        tempDiv.innerHTML = `<span class='text-purple-400 font-black'>ALPHA IA (Gemini):</span> ${response.text()}`;
     } catch (error) {
-        tempDiv.innerHTML = `<span class='text-red-400 font-black'>ERRO:</span> Não foi possível conectar ao Gemini. Verifique sua API Key.`;
-        console.error(error);
+        tempDiv.innerHTML = `<span class='text-red-400 font-black'>ERRO:</span> Verifique sua chave ou conexão.`;
+        console.error("Erro IA:", error);
     }
 
     document.getElementById('pergunta-ia').value = "";
     chat.scrollTop = chat.scrollHeight;
 };
 
-// --- CRUD ---
+// --- OPERAÇÕES CRUD ---
 window.adicionarFundo = async () => {
     const payload = {
         uid: usuarioAtual.uid,
@@ -256,11 +245,7 @@ window.adicionarFundo = async () => {
         timestamp: serverTimestamp()
     };
 
-    if (idEdicaoAtiva) {
-        await updateDoc(doc(db, "ativos", idEdicaoAtiva), payload);
-    } else {
-        await addDoc(collection(db, "ativos"), payload);
-    }
+    idEdicaoAtiva ? await updateDoc(doc(db, "ativos", idEdicaoAtiva), payload) : await addDoc(collection(db, "ativos"), payload);
     window.cancelarEdicao();
 };
 
@@ -277,7 +262,7 @@ window.prepararEdicao = async (id) => {
         document.getElementById('data-pg-input').value = i.dataPg || "";
         document.getElementById('segmento-input').value = i.segmento;
         idEdicaoAtiva = id;
-        document.getElementById('btn-registrar').innerText = "Salvar Alteração";
+        document.getElementById('btn-registrar').innerText = "Confirmar Edição";
         document.getElementById('btn-cancelar').classList.remove('hidden');
     }
 };
@@ -289,4 +274,4 @@ window.cancelarEdicao = () => {
     ['ticker-input', 'qtd-input', 'pm-input', 'nota-input', 'teto-input', 'data-com-input', 'data-pg-input'].forEach(i => document.getElementById(i).value = '');
 };
 
-window.deletarAtivo = (id) => confirm("Remover?") && deleteDoc(doc(db, "ativos", id));
+window.deletarAtivo = (id) => confirm("Remover permanentemente?") && deleteDoc(doc(db, "ativos", id));
