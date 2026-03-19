@@ -2,30 +2,30 @@ import { db, auth, provider, signInWithPopup, signOut } from './firebase-config.
 import { collection, addDoc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 let usuarioAtual = null;
-const API_TOKEN = 'SEU_TOKEN_BRAPI'; // Obtenha em brapi.dev
+let chartInstancia = null;
+const API_TOKEN = 'SUA_CHAVE_BRAPI_AQUI'; // Pegue grátis em brapi.dev
 
-// --- LOGIN / LOGOUT ---
-window.fazerLogin = async () => {
-    try {
-        const result = await signInWithPopup(auth, provider);
-        usuarioAtual = result.user;
-        carregarDados();
-    } catch (error) {
-        console.error("Erro ao logar:", error);
-    }
-};
-
+// --- LOGIN ---
 auth.onAuthStateChanged(user => {
     if (user) {
         usuarioAtual = user;
-        document.getElementById('user-info').innerHTML = `Olá, ${user.displayName} | <button onclick="signOut(auth)" class="text-red-400">Sair</button>`;
+        document.getElementById('user-info').innerHTML = `
+            <img src="${user.photoURL}" class="w-8 h-8 rounded-full border border-emerald-500">
+            <span class="hidden md:block text-sm font-bold text-slate-300">${user.displayName}</span>
+            <button onclick="fazerLogout()" class="text-red-400 text-xs hover:underline">Sair</button>
+        `;
         carregarDados();
     } else {
-        document.getElementById('user-info').innerHTML = `<button onclick="fazerLogin()" class="bg-white text-black px-4 py-1 rounded">Login com Google</button>`;
+        document.getElementById('user-info').innerHTML = `
+            <button onclick="fazerLogin()" class="bg-emerald-500 text-slate-950 px-6 py-2 rounded-xl font-bold">Entrar com Google</button>
+        `;
     }
 });
 
-// --- BUSCA DE PREÇO (API) ---
+window.fazerLogin = () => signInWithPopup(auth, provider);
+window.fazerLogout = () => signOut(auth);
+
+// --- API E CÁLCULOS ---
 async function buscarCotacao(ticker) {
     try {
         const res = await fetch(`https://brapi.dev/api/quote/${ticker}?token=${API_TOKEN}`);
@@ -34,13 +34,18 @@ async function buscarCotacao(ticker) {
     } catch (e) { return null; }
 }
 
-// --- ADICIONAR AO FIRESTORE ---
-window.adicionarFundo = async () => {
-    if (!usuarioAtual) return alert("Faça login primeiro!");
+// Cálculo do Preço Teto (Simplificado para o exemplo - Projeção de R$ 1,00/mês por cota)
+// Fórmula: (Dividendo Mensal * 12) / 0.06 (6% de Yield Desejado)
+const calcularPrecoTeto = (ticker) => 200.00; // Aqui você pode integrar uma API de dividendos
 
-    const ticker = document.getElementById('ticker-input').value.toUpperCase();
+// --- OPERAÇÕES ---
+window.adicionarFundo = async () => {
+    if (!usuarioAtual) return alert("Faça login!");
+    const ticker = document.getElementById('ticker-input').value.toUpperCase().trim();
     const quantidade = parseFloat(document.getElementById('qtd-input').value);
     const precoMedio = parseFloat(document.getElementById('pm-input').value);
+
+    if(!ticker || !quantidade) return;
 
     try {
         await addDoc(collection(db, "ativos"), {
@@ -48,49 +53,82 @@ window.adicionarFundo = async () => {
             ticker,
             quantidade,
             precoMedio,
-            data: new Date()
+            timestamp: new Date()
         });
-        alert("Ativo salvo com sucesso!");
-    } catch (e) { console.error("Erro ao salvar:", e); }
+        document.getElementById('ticker-input').value = '';
+    } catch (e) { alert("Erro ao salvar"); }
 };
 
-// --- RENDERIZAR EM TEMPO REAL ---
 function carregarDados() {
-    if (!usuarioAtual) return;
-
     const q = query(collection(db, "ativos"), where("uid", "==", usuarioAtual.uid));
     
-    // O onSnapshot atualiza a tela automaticamente se o banco mudar!
-    onSnapshot(q, async (querySnapshot) => {
+    onSnapshot(q, async (snapshot) => {
         const corpo = document.getElementById('tabela-corpo');
-        corpo.innerHTML = '<tr><td colspan="6" class="p-4 text-center">Atualizando cotações...</td></tr>';
-        
+        let totalCarteira = 0;
+        let tickers = [];
+        let totais = [];
         let html = '';
-        let totalPatrimonio = 0;
 
-        for (const doc of querySnapshot.docs) {
+        for (const doc of snapshot.docs) {
             const item = doc.data();
-            const dados = await buscarCotacao(item.ticker);
-            const precoAtual = dados?.regularMarketPrice || 0;
-            const totalAtivo = precoAtual * item.quantidade;
-            totalPatrimonio += totalAtivo;
+            const apiData = await buscarCotacao(item.ticker);
+            const precoAtual = apiData?.regularMarketPrice || 0;
+            const valorTotalAtivo = precoAtual * item.quantidade;
+            
+            // Lógica Bazin (6% ao ano)
+            // No MVP, vamos simular que cada FII paga 0.8% ao mês
+            const dyMensalEstimado = 0.008; 
+            const precoTeto = (precoAtual * dyMensalEstimado * 12) / 0.06;
+            const margem = ((precoTeto / precoAtual) - 1) * 100;
+
+            totalCarteira += valorTotalAtivo;
+            tickers.push(item.ticker);
+            totais.push(valorTotalAtivo);
 
             html += `
-                <tr class="border-b border-slate-700">
-                    <td class="p-4">${item.ticker}</td>
-                    <td class="p-4 text-emerald-400">R$ ${precoAtual.toFixed(2)}</td>
+                <tr class="hover:bg-slate-800/30 transition-all">
+                    <td class="p-4 font-bold text-emerald-400">${item.ticker}</td>
+                    <td class="p-4 font-semibold text-white">R$ ${precoAtual.toFixed(2)}</td>
+                    <td class="p-4 text-slate-400">R$ ${precoTeto.toFixed(2)}</td>
                     <td class="p-4">${item.quantidade}</td>
-                    <td class="p-4">R$ ${item.precoMedio.toFixed(2)}</td>
-                    <td class="p-4 font-bold text-white">R$ ${totalAtivo.toFixed(2)}</td>
+                    <td class="p-4 font-bold">R$ ${valorTotalAtivo.toFixed(2)}</td>
                     <td class="p-4">
-                        <span class="px-2 py-1 rounded text-xs ${precoAtual < item.precoMedio ? 'bg-emerald-900 text-emerald-300' : 'bg-red-900 text-red-300'}">
-                            ${precoAtual < item.precoMedio ? 'Abaixo do PM' : 'Acima do PM'}
+                        <span class="px-3 py-1 rounded-full text-[10px] font-black ${margem > 0 ? 'bg-emerald-900/50 text-emerald-400' : 'bg-red-900/50 text-red-400'}">
+                            ${margem > 0 ? '+' : ''}${margem.toFixed(1)}%
                         </span>
                     </td>
                 </tr>
             `;
         }
+
         corpo.innerHTML = html;
-        document.getElementById('total-patrimonio').innerText = `R$ ${totalPatrimonio.toLocaleString('pt-BR')}`;
+        document.getElementById('total-patrimonio').innerText = `R$ ${totalCarteira.toLocaleString('pt-BR')}`;
+        document.getElementById('total-dividendos').innerText = `R$ ${(totalCarteira * 0.008).toLocaleString('pt-BR')}`;
+        document.getElementById('qtd-ativos').innerText = snapshot.size;
+        
+        renderizarGrafico(tickers, totais);
+    });
+}
+
+function renderizarGrafico(labels, data) {
+    const ctx = document.getElementById('chartDistribuicao');
+    if (chartInstancia) chartInstancia.destroy();
+    
+    chartInstancia = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444'],
+                borderWidth: 0,
+                cutout: '70%'
+            }]
+        },
+        options: {
+            plugins: {
+                legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 } } }
+            }
+        }
     });
 }
