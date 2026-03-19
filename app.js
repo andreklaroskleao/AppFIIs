@@ -5,6 +5,7 @@ import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai";
 // --- CONFIGURAÇÕES ---
 const API_KEY_BRAPI = "hshuPrGV3kvLM6Yh8FEDrD";
 const GEMINI_API_KEY = "AIzaSyDV3PHVBEeawB6h_uBYwxMtrKHBA0Tyl2M";
+const OPENROUTER_API_KEY = "7njOS7PdMHSfAvxcYdB76ByqO0atESVv";
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
@@ -198,35 +199,83 @@ window.carregarDados = () => {
 window.perguntarIA = async () => {
     const pergunta = document.getElementById('pergunta-ia').value;
     const chat = document.getElementById('chat-ia-respostas');
+
     if (!pergunta) return;
 
-    chat.innerHTML += `<div class='mb-2'>Você: ${pergunta}</div>`;
+    const contextoCarteira = dadosAtuaisParaIA.map(a => ({
+        ticker: a.ticker,
+        segmento: a.segmento || 'FII',
+        total: a.total.toFixed(2),
+        abaixoTeto: a.preco <= a.precoTeto
+    }));
 
-    try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{ text: pergunta }]
-                }]
-            })
-        });
+    chat.innerHTML += `
+        <div class='mb-2 p-2 bg-slate-800/40 rounded-lg text-[10px]'>
+            <span class='text-slate-500 font-bold uppercase'>Você:</span> ${pergunta}
+        </div>
+    `;
 
-        const data = await res.json();
+    const box = document.createElement("div");
+    box.className = "mb-4 p-2 border-l-2 border-purple-500 bg-purple-500/5 text-purple-200 text-[10px]";
+    box.innerHTML = "IA analisando...";
+    chat.appendChild(box);
+    chat.scrollTop = chat.scrollHeight;
 
-        const resposta = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Sem resposta";
+    const modelos = [
+        "mistralai/mistral-7b-instruct:free",
+        "meta-llama/llama-3-8b-instruct:free"
+    ];
 
-        chat.innerHTML += `<div class='mb-4 text-purple-400'>IA: ${resposta}</div>`;
+    let respostaFinal = null;
 
-    } catch (err) {
-        console.error(err);
-        chat.innerHTML += `<div class='text-red-400'>Erro na IA</div>`;
+    for (const modelo of modelos) {
+        try {
+            const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    model: modelo,
+                    messages: [
+                        {
+                            role: "system",
+                            content: "Você é um analista profissional de FIIs, direto, crítico e objetivo."
+                        },
+                        {
+                            role: "user",
+                            content: `Carteira: ${JSON.stringify(contextoCarteira)}. Pergunta: ${pergunta}`
+                        }
+                    ]
+                })
+            });
+
+            const data = await res.json();
+
+            const resposta = data?.choices?.[0]?.message?.content;
+
+            if (resposta) {
+                respostaFinal = `(${modelo.split('/')[1]}) ${resposta}`;
+                break;
+            }
+
+        } catch (err) {
+            console.warn("Falha no modelo:", modelo);
+        }
     }
 
+    // fallback final (sem API)
+    if (!respostaFinal) {
+        respostaFinal = gerarRespostaLocal(contextoCarteira, pergunta);
+    }
+
+    box.innerHTML = `
+        <span class='text-purple-400 font-black uppercase'>IA:</span> ${respostaFinal}
+    `;
+
     document.getElementById('pergunta-ia').value = "";
+    chat.scrollTop = chat.scrollHeight;
 };
 // --- OPERAÇÕES DE BANCO DE DADOS (CRUD) ---
 window.adicionarFundo = async () => {
@@ -282,9 +331,22 @@ window.cancelarEdicao = () => {
 
 window.deletarAtivo = (id) => confirm("Deseja realmente excluir este ativo?") && deleteDoc(doc(db, "ativos", id));
 
-window.testarAPI = async () => {
-  const res = await fetch("https://generativelanguage.googleapis.com/v1/models?key=SUA_API_KEY");
-  const data = await res.json();
-  console.log(data);
-  alert(JSON.stringify(data, null, 2));
-};
+function gerarRespostaLocal(carteira, pergunta) {
+    if (!carteira.length) return "Sua carteira está vazia.";
+
+    const abaixoTeto = carteira.filter(a => a.abaixoTeto);
+
+    if (pergunta.toLowerCase().includes("comprar")) {
+        if (abaixoTeto.length === 0) {
+            return "Nenhum ativo abaixo do preço teto. Evite aportes agora.";
+        }
+
+        return "Ativos abaixo do teto: " + abaixoTeto.map(a => a.ticker).join(", ");
+    }
+
+    if (pergunta.toLowerCase().includes("risco")) {
+        return "Carteira diversificada em " + new Set(carteira.map(a => a.segmento)).size + " segmentos.";
+    }
+
+    return "Não consegui acessar IA externa, mas sua carteira está ativa e monitorada.";
+}
