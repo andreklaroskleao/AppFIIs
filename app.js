@@ -204,48 +204,46 @@ window.perguntarIA = async () => {
     const contextoCarteira = dadosAtuaisParaIA.map(a => ({
         ticker: a.ticker,
         segmento: a.segmento || 'FII',
-        quantidade: a.quantidade,
-        precoAtual: a.preco,
-        precoTeto: a.precoTeto,
-        rendimentoMensal: (a.quantidade * a.divEstimado).toFixed(2)
+        total: a.total.toFixed(2),
+        abaixoTeto: a.preco <= a.precoTeto
     }));
 
     chat.innerHTML += `<div class='mb-2 p-2 bg-slate-800/40 rounded-lg text-[10px]'><span class='text-slate-500 font-bold uppercase'>Você:</span> ${pergunta}</div>`;
     const tempDiv = document.createElement("div");
     tempDiv.className = "mb-4 p-2 border-l-2 border-purple-500 bg-purple-500/5 text-purple-200 text-[10px]";
-    tempDiv.innerHTML = "<span class='animate-pulse italic'>Alpha IA processando dados da carteira...</span>";
+    tempDiv.innerHTML = "<span class='animate-pulse italic'>Alpha IA procurando melhor modelo disponível...</span>";
     chat.appendChild(tempDiv);
     chat.scrollTop = chat.scrollHeight;
 
-    try {
-        // Forçamos o modelo 1.5-flash com tratamento de erro
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // Lista de modelos para tentar (do mais novo ao mais estável)
+    const modelosParaTentar = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"];
+    let sucesso = false;
 
-        const promptGeral = `
-            Você é o Alpha Insight, analista de investimentos sênior.
-            Contexto da Carteira do Usuário: ${JSON.stringify(contextoCarteira)}
-            Total Investido: R$ ${dadosAtuaisParaIA.reduce((a, b) => a + b.total, 0).toFixed(2)}
+    for (const nomeModelo of modelosParaTentar) {
+        if (sucesso) break;
+        try {
+            const model = genAI.getGenerativeModel({ model: nomeModelo });
+            const promptGeral = `Você é um analista financeiro. Carteira: ${JSON.stringify(contextoCarteira)}. Pergunta: ${pergunta}`;
             
-            Regras:
-            1. Seja técnico, curto e use termos de mercado.
-            2. Analise se há ativos acima do preço teto.
-            3. Verifique a diversificação por segmento.
+            const result = await model.generateContent(promptGeral);
+            const response = await result.response;
+            const text = response.text();
             
-            Pergunta do usuário: ${pergunta}
-        `;
+            tempDiv.innerHTML = `<span class='text-purple-400 font-black uppercase'>Alpha IA (${nomeModelo}):</span> ${text}`;
+            sucesso = true;
+        } catch (err) {
+            console.warn(`Falha no modelo ${nomeModelo}:`, err);
+            // Continua para o próximo modelo da lista
+        }
+    }
 
-        const result = await model.generateContent(promptGeral);
-        const response = await result.response;
-        tempDiv.innerHTML = `<span class='text-purple-400 font-black uppercase'>Alpha IA (Gemini):</span> ${response.text()}`;
-    } catch (error) {
-        console.error("Erro na IA:", error);
-        tempDiv.innerHTML = `<span class='text-red-400 font-black'>AVISO:</span> Não foi possível acessar o Gemini 1.5. Verifique se a chave API tem as permissões necessárias para o modelo Flash no Google AI Studio.`;
+    if (!sucesso) {
+        tempDiv.innerHTML = `<span class='text-red-400 font-black uppercase'>Erro Crítico:</span> Nenhum modelo Gemini disponível. Verifique se sua chave de API possui permissão para 'Generative Language API' no Google Cloud Console.`;
     }
 
     document.getElementById('pergunta-ia').value = "";
     chat.scrollTop = chat.scrollHeight;
 };
-
 // --- OPERAÇÕES DE BANCO DE DADOS (CRUD) ---
 window.adicionarFundo = async () => {
     const payload = {
