@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FII-Insight Ultra | v6.0</title>
+    <title>FII-Insight Ultra | v12.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;900&display=swap" rel="stylesheet">
@@ -19,11 +19,11 @@
 
     <nav class="border-b border-slate-800 p-4 sticky top-0 z-50 glass flex justify-between items-center">
         <div class="flex items-center gap-6">
-            <h1 class="text-xl font-black text-emerald-400 italic tracking-tighter">FII-INSIGHT <span class="text-white text-[10px] bg-emerald-600 px-1 rounded not-italic">V6.0</span></h1>
-            <div class="hidden md:flex gap-6 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                <button onclick="mudarAba('dash')" id="tab-dash" class="tab-active py-2">Monitor</button>
-                <button onclick="mudarAba('simulador')" id="tab-simulador" class="py-2 hover:text-white transition">Simulador Renda</button>
-                <button onclick="mudarAba('ir')" id="tab-ir" class="py-2 hover:text-white transition">Relatório I.R.</button>
+            <h1 class="text-xl font-black text-emerald-400 italic tracking-tighter">FII-INSIGHT <span class="text-white text-[10px] bg-emerald-600 px-1 rounded not-italic">V12</span></h1>
+            <div class="hidden md:flex gap-6 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                <button onclick="window.mudarAba('dash')" id="tab-dash" class="tab-active py-2 transition-colors hover:text-white">Monitor</button>
+                <button onclick="window.mudarAba('simulador')" id="tab-simulador" class="py-2 transition-colors hover:text-white">Simulador</button>
+                <button onclick="window.mudarAba('ir')" id="tab-ir" class="py-2 transition-colors hover:text-white">Relatório I.R.</button>
             </div>
         </div>
         <div id="user-info" class="flex items-center gap-3"></div>
@@ -33,77 +33,82 @@
         
         <div id="secao-dash">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div class="glass p-5 rounded-2xl">
+                <div class="glass p-5 rounded-2xl border-l-2 border-slate-700">
                     <p class="text-slate-500 text-[10px] font-bold uppercase">Patrimônio Atual</p>
                     <h2 id="total-patrimonio" class="text-2xl font-black font-mono">R$ 0,00</h2>
                 </div>
-                <div class="glass p-5 rounded-2xl">
+                <div class="glass p-5 rounded-2xl border-l-2 border-blue-500">
                     <p class="text-slate-500 text-[10px] font-bold uppercase">P/VP Médio</p>
                     <h2 id="pvp-medio" class="text-2xl font-black text-blue-400 font-mono">0.00</h2>
                 </div>
-                <div class="glass p-5 rounded-2xl border-l-4 border-emerald-500">
-                    <p class="text-slate-500 text-[10px] font-bold uppercase">Renda Mensal Est.</p>
+                <div class="glass p-5 rounded-2xl border-l-2 border-emerald-500">
+                    <p class="text-slate-500 text-[10px] font-bold uppercase">Renda Mensal Est. (0.85%)</p>
                     <h2 id="total-dividendos" class="text-2xl font-black text-emerald-400 font-mono">R$ 0,00</h2>
                 </div>
-                <div class="glass p-5 rounded-2xl border-l-4 border-orange-500">
-                    <p class="text-slate-500 text-[10px] font-bold uppercase">Saldo de Valorização</p>
+                <div class="glass p-5 rounded-2xl border-l-2 border-orange-500">
+                    <p class="text-slate-500 text-[10px] font-bold uppercase">Resultado (Lucro/Prejuízo)</p>
                     <h2 id="lucro-total" class="text-2xl font-black font-mono text-orange-400">R$ 0,00</h2>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
                 <div class="xl:col-span-1 glass p-6 rounded-2xl h-fit">
-                    <h3 class="font-bold mb-4 text-xs uppercase text-emerald-400">Novo Aporte</h3>
+                    <h3 class="font-bold mb-4 text-xs uppercase text-emerald-400 tracking-widest">Novo Aporte</h3>
                     <div class="space-y-3">
-                        <input type="text" id="ticker-input" placeholder="Ticker (ex: KNRI11)" class="w-full bg-slate-900 border-none rounded-lg p-3 text-sm focus:ring-1 ring-emerald-500 outline-none">
-                        <input type="number" id="qtd-input" placeholder="Qtd" class="w-full bg-slate-900 border-none rounded-lg p-3 text-sm">
-                        <input type="number" id="pm-input" placeholder="Preço Médio" class="w-full bg-slate-900 border-none rounded-lg p-3 text-sm">
-                        <button onclick="adicionarFundo()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3 rounded-lg transition-all text-xs uppercase tracking-tighter">Salvar na Nuvem</button>
+                        <input type="text" id="ticker-input" placeholder="Ticker (ex: KNRI11)" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm focus:border-emerald-500 outline-none uppercase font-mono">
+                        <input type="number" id="qtd-input" placeholder="Quantidade" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm focus:border-emerald-500 outline-none">
+                        <input type="number" id="pm-input" placeholder="Preço Médio (R$)" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm focus:border-emerald-500 outline-none">
+                        <button onclick="window.adicionarFundo()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg transition-all text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/20">Registrar Ativo</button>
                     </div>
-                    <div class="mt-8">
+                    <div class="mt-8 relative h-48 w-full">
                         <canvas id="chartDistribuicao"></canvas>
                     </div>
                 </div>
 
-                <div class="xl:col-span-3 glass rounded-2xl overflow-hidden">
-                    <table class="w-full text-left text-[11px] md:text-xs">
-                        <thead>
-                            <tr class="bg-slate-900/80 text-slate-500 border-b border-slate-800">
-                                <th class="p-4">FII</th>
-                                <th class="p-4">COTAÇÃO</th>
-                                <th class="p-4">P/VP</th>
-                                <th class="p-4">P. MÉDIO</th>
-                                <th class="p-4">QTD</th>
-                                <th class="p-4">TOTAL</th>
-                                <th class="p-4">RESULTADO</th>
-                                <th class="p-4 text-center">AÇÕES</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabela-corpo" class="divide-y divide-slate-800/50"></tbody>
-                    </table>
+                <div class="xl:col-span-3 glass rounded-2xl overflow-hidden shadow-2xl">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-[11px] md:text-xs">
+                            <thead>
+                                <tr class="bg-slate-900 text-slate-400 border-b border-slate-700 uppercase tracking-wider">
+                                    <th class="p-4 font-bold">Ativo</th>
+                                    <th class="p-4 font-bold">Cotação</th>
+                                    <th class="p-4 font-bold">P/VP</th>
+                                    <th class="p-4 font-bold">P. Médio</th>
+                                    <th class="p-4 font-bold">Qtd</th>
+                                    <th class="p-4 font-bold">Total</th>
+                                    <th class="p-4 font-bold">Retorno</th>
+                                    <th class="p-4 font-bold text-center">Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-corpo" class="divide-y divide-slate-800/50">
+                                </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
 
         <div id="secao-simulador" class="hidden">
-            <div class="max-w-4xl mx-auto glass p-8 rounded-3xl">
-                <h2 class="text-2xl font-black text-blue-400 mb-2 italic">SIMULADOR DE RENDA PASSIVA</h2>
-                <p class="text-slate-400 text-sm mb-8">Quanto você quer ganhar por mês?</p>
+            <div class="max-w-4xl mx-auto glass p-8 rounded-3xl border-t-4 border-blue-500">
+                <h2 class="text-2xl font-black text-blue-400 mb-2 uppercase tracking-tighter">Projetor de Renda Passiva</h2>
+                <p class="text-slate-400 text-sm mb-8">Defina sua meta mensal e descubra o caminho para a independência financeira.</p>
                 
                 <div class="flex gap-4 mb-10">
-                    <input type="number" id="meta-renda" placeholder="Ex: 5000" class="flex-1 bg-slate-900 border-2 border-blue-500/30 rounded-2xl p-4 text-2xl font-black text-white outline-none focus:border-blue-500">
-                    <button onclick="calcularSimulacao()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-8 rounded-2xl transition-all uppercase text-xs">Calcular</button>
+                    <input type="number" id="meta-renda" placeholder="Meta Mensal (Ex: 5000)" class="flex-1 bg-slate-900 border-2 border-slate-700 rounded-xl p-4 text-2xl font-black text-white outline-none focus:border-blue-500 font-mono">
+                    <button onclick="window.calcularSimulacao()" class="bg-blue-600 hover:bg-blue-500 text-white font-black px-8 rounded-xl transition-all uppercase text-sm tracking-widest">Calcular</button>
                 </div>
 
-                <div id="resultado-simulacao" class="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-0 transition-opacity">
+                <div id="resultado-simulacao" class="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-0 transition-opacity duration-500">
                     </div>
             </div>
         </div>
 
         <div id="secao-ir" class="hidden">
-            <div class="glass p-8 rounded-3xl border border-emerald-500/20">
-                <h2 class="text-2xl font-black text-emerald-400 mb-6 uppercase tracking-tighter">Bens e Direitos - I.R.</h2>
-                <div id="lista-ir" class="space-y-4"></div>
+            <div class="glass p-8 rounded-3xl border-t-4 border-emerald-500 max-w-5xl mx-auto">
+                <h2 class="text-2xl font-black text-emerald-400 mb-2 uppercase tracking-tighter">Declaração de Bens e Direitos</h2>
+                <p class="text-slate-400 text-sm mb-8">Copie as descrições abaixo para o programa da Receita Federal.</p>
+                <div id="lista-ir" class="space-y-4">
+                    </div>
             </div>
         </div>
 
