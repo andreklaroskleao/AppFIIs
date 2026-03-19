@@ -1,152 +1,215 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="color-scheme" content="dark">
-    <title>FII-INSIGHT PRO TERMINAL</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FII Insight</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <link rel="stylesheet" href="./style.css" />
 </head>
-<body class="min-h-screen">
-    <nav class="border-b border-slate-800 p-4 glass sticky top-0 z-50 flex justify-between items-center gap-4">
-        <div class="flex items-center gap-6 min-w-0">
-            <h1 class="text-lg font-black text-emerald-500 italic tracking-tighter uppercase whitespace-nowrap">FII-INSIGHT</h1>
-            <div class="flex gap-4 text-[10px] font-black uppercase tracking-widest text-slate-500 overflow-x-auto scrollbar-hide" id="abas-nav">
-                <button type="button" data-aba="dash" class="tab-active py-2 text-white whitespace-nowrap">Monitor Alpha</button>
-                <button type="button" data-aba="proventos" class="py-2 whitespace-nowrap">Rendimentos</button>
-            </div>
-        </div>
-        <div class="flex items-center gap-4">
-            <button id="btn-ghost" type="button" class="p-2 bg-slate-800 rounded-xl hover:bg-slate-700 transition" aria-label="Ativar modo privacidade">
-                <span id="ghost-icon">👁️</span>
-            </button>
-            <div id="user-info"></div>
-        </div>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div class="max-w-7xl mx-auto px-4 py-6">
+    <header class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
+      <div>
+        <h1 class="text-3xl font-black tracking-tight text-white">FII Insight</h1>
+        <p class="text-slate-400 text-sm">Controle de portfólio, proventos e rebalanceamento.</p>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button
+          id="btn-ghost"
+          type="button"
+          class="px-4 py-2 rounded-xl border border-slate-700 bg-slate-900 hover:bg-slate-800 transition text-sm font-bold"
+          aria-label="Ativar ou desativar modo privacidade"
+          title="Modo privacidade"
+        >
+          <span id="ghost-icon">👁️</span>
+        </button>
+
+        <div id="user-info"></div>
+      </div>
+    </header>
+
+    <nav id="abas-nav" class="flex gap-2 mb-6 border-b border-slate-800 pb-2">
+      <button
+        type="button"
+        data-aba="dash"
+        class="tab-active text-white px-4 py-2 rounded-xl text-sm font-black uppercase tracking-wide"
+      >
+        Dashboard
+      </button>
+      <button
+        type="button"
+        data-aba="proventos"
+        class="text-slate-400 px-4 py-2 rounded-xl text-sm font-black uppercase tracking-wide hover:text-white transition"
+      >
+        Proventos
+      </button>
     </nav>
 
-    <main class="p-6 container mx-auto space-y-8">
-        <div id="secao-dash">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div class="glass p-6 rounded-3xl border-b-4 border-emerald-500">
-                    <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest">Patrimônio</p>
-                    <h2 id="total-patrimonio" class="text-2xl font-black mt-2 val-sensivel mono">R$ 0,00</h2>
-                </div>
-                <div class="glass p-6 rounded-3xl border-b-4 border-blue-500">
-                    <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest text-nowrap">Projeção Mensal / Hora</p>
-                    <div class="flex flex-col mt-2">
-                        <h2 id="renda-mes" class="text-xl font-black text-blue-400 val-sensivel mono">R$ 0,00</h2>
-                        <span id="renda-hora" class="text-[10px] text-blue-300/50 font-bold val-sensivel">R$ 0,00 / hora</span>
-                    </div>
-                </div>
-                <div class="glass p-6 rounded-3xl border-b-4 border-purple-500">
-                    <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest">Yield On Cost</p>
-                    <h2 id="yoc-medio" class="text-2xl font-black text-purple-400 mt-2 mono">0.00%</h2>
-                </div>
-                <div class="glass p-6 rounded-3xl border-b-4 border-red-500">
-                    <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest">Risco Estresse (5%)</p>
-                    <h2 id="queda-pat" class="text-2xl font-black text-red-500 mt-2 val-sensivel mono">- R$ 0,00</h2>
-                </div>
-            </div>
-
-            <div class="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide" id="container-filtros">
-                <button type="button" data-filtro="Todos" class="btn-filtro active">Todos</button>
-                <button type="button" data-filtro="Papel" class="btn-filtro">Papel</button>
-                <button type="button" data-filtro="Tijolo" class="btn-filtro">Tijolo</button>
-                <button type="button" data-filtro="Agro" class="btn-filtro">Agro</button>
-                <button type="button" data-filtro="Fundo de Fundo" class="btn-filtro">FOF</button>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="space-y-6">
-                    <div class="glass p-8 rounded-[2.5rem] border border-white/5">
-                        <h3 id="form-titulo" class="text-xs font-black uppercase text-emerald-400 mb-6 flex items-center gap-2">
-                            <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Gerenciar Ativo
-                        </h3>
-                        <div class="space-y-3">
-                            <input type="text" id="ticker-input" placeholder="TICKER" class="input-pro uppercase font-black tracking-widest" autocomplete="off" spellcheck="false">
-                            <div class="grid grid-cols-2 gap-3">
-                                <input type="number" id="qtd-input" placeholder="QTD" class="input-pro text-xs" min="0" step="1">
-                                <input type="number" id="pm-input" placeholder="P. MÉDIO" class="input-pro text-xs" min="0" step="0.01">
-                            </div>
-                            <div class="grid grid-cols-2 gap-3">
-                                <input type="number" id="nota-input" placeholder="NOTA (0-10)" class="input-pro text-xs text-blue-400" min="0" max="10" step="1">
-                                <input type="number" id="teto-input" placeholder="P. TETO" class="input-pro text-xs text-emerald-400" min="0" step="0.01">
-                            </div>
-                            <div class="grid grid-cols-2 gap-3 border-t border-slate-800 pt-4 mt-2">
-                                <div class="flex flex-col gap-1">
-                                    <label for="data-com-input" class="text-[9px] font-black text-slate-500 uppercase ml-1">Dia Data Com</label>
-                                    <input type="number" id="data-com-input" placeholder="EX: 10" class="input-pro text-xs" min="1" max="31" step="1">
-                                </div>
-                                <div class="flex flex-col gap-1">
-                                    <label for="data-pg-input" class="text-[9px] font-black text-slate-500 uppercase ml-1">Dia Pagamento</label>
-                                    <input type="number" id="data-pg-input" placeholder="EX: 15" class="input-pro text-xs" min="1" max="31" step="1">
-                                </div>
-                            </div>
-                            <select id="segmento-input" class="input-pro text-[10px] uppercase font-black text-slate-400">
-                                <option value="Papel" selected>Papel (CRI)</option>
-                                <option value="Tijolo">Tijolo</option>
-                                <option value="Agro">Agro</option>
-                                <option value="Fundo de Fundo">FOF</option>
-                            </select>
-                            <button id="btn-registrar" type="button" class="w-full bg-emerald-600 hover:bg-emerald-500 font-black py-4 rounded-2xl uppercase text-[11px] shadow-lg shadow-emerald-900/20 transition-all mt-4">Salvar no Portfólio</button>
-                            <button id="btn-cancelar" type="button" class="hidden w-full text-slate-500 text-[10px] font-black uppercase mt-2 hover:text-white transition">Cancelar Edição</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="lg:col-span-2 space-y-6">
-                    <div class="glass p-6 rounded-3xl border-l-4 border-blue-500">
-                        <div class="flex justify-between items-center gap-4 mb-6 flex-wrap">
-                            <h3 class="text-xs font-black uppercase text-blue-400 tracking-tighter">Oportunidades de Rebalanceamento</h3>
-                            <div class="flex items-center gap-2">
-                                <span class="text-[9px] text-slate-500 font-black uppercase">Caixa:</span>
-                                <input type="number" id="caixa-disponivel" placeholder="R$ 0,00" class="bg-slate-900 border border-blue-900/30 rounded-lg p-2 text-[10px] text-blue-400 w-28 font-black" min="0" step="0.01">
-                            </div>
-                        </div>
-                        <div id="painel-aportes" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-                    </div>
-
-                    <div class="glass rounded-[2rem] overflow-hidden shadow-2xl">
-                        <div class="overflow-x-auto">
-                            <table class="text-left text-[11px] min-w-[900px]">
-                                <thead class="bg-slate-900/50">
-                                    <tr>
-                                        <th class="p-6">Ativo</th>
-                                        <th class="p-6">Preço / Teto</th>
-                                        <th class="p-6">Agenda</th>
-                                        <th class="p-6">Alocação / Projeção</th>
-                                        <th class="p-6 text-right">Posição Total</th>
-                                        <th class="p-6 text-center">Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tabela-corpo" class="divide-y divide-slate-800/50">
-                                    <tr><td colspan="6" class="p-10 text-center text-slate-500 italic">Faça login para carregar seus ativos.</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <section id="secao-dash">
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
+        <div class="card-glass p-5 rounded-2xl">
+          <div class="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-2">Patrimônio</div>
+          <div id="total-patrimonio" class="text-2xl font-black text-white val-sensivel">R$ 0,00</div>
         </div>
 
-        <div id="secao-proventos" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div class="glass p-8 rounded-[2.5rem] h-fit border-t-4 border-blue-500">
-                <h3 class="text-xs font-black uppercase text-blue-400 mb-6">Lançar Rendimento</h3>
-                <div class="space-y-4">
-                    <input type="text" id="prov-ticker" placeholder="TICKER" class="input-pro uppercase font-bold" autocomplete="off" spellcheck="false">
-                    <input type="number" id="prov-valor" placeholder="VALOR TOTAL (R$)" class="input-pro font-black text-emerald-400" min="0" step="0.01">
-                    <input type="month" id="prov-data" class="input-pro text-slate-400">
-                    <button id="btn-registrar-provento" type="button" class="w-full bg-blue-600 hover:bg-blue-500 font-black py-4 rounded-2xl text-xs uppercase shadow-lg shadow-blue-900/20 transition-all">Efetuar Registro</button>
-                </div>
-            </div>
-            <div class="lg:col-span-2 glass p-8 rounded-[2.5rem] min-h-[500px] shadow-xl flex items-center justify-center">
-                <canvas id="chartProventos" aria-label="Gráfico de proventos por mês"></canvas>
-            </div>
+        <div class="card-glass p-5 rounded-2xl">
+          <div class="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-2">Renda Mensal</div>
+          <div id="renda-mes" class="text-2xl font-black text-emerald-400 val-sensivel">R$ 0,00</div>
         </div>
-    </main>
 
-    <script type="module" src="app.js"></script>
+        <div class="card-glass p-5 rounded-2xl">
+          <div class="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-2">Renda por Hora</div>
+          <div id="renda-hora" class="text-2xl font-black text-blue-400 val-sensivel">R$ 0,00 / hora</div>
+        </div>
+
+        <div class="card-glass p-5 rounded-2xl">
+          <div class="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-2">YoC Médio</div>
+          <div id="yoc-medio" class="text-2xl font-black text-purple-400 val-sensivel">0.00%</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
+        <div class="xl:col-span-2 card-glass rounded-2xl p-5">
+          <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-4">
+            <div>
+              <h2 class="text-lg font-black text-white">Portfólio</h2>
+              <p class="text-slate-400 text-sm">Acompanhe preços, agenda e participação.</p>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <label for="caixa-disponivel" class="text-xs uppercase text-slate-400 font-bold">Caixa</label>
+              <input
+                id="caixa-disponivel"
+                type="number"
+                min="0"
+                step="0.01"
+                value="0"
+                class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white w-36 outline-none focus:border-emerald-500"
+              />
+            </div>
+          </div>
+
+          <div id="container-filtros" class="flex flex-wrap gap-2 mb-4">
+            <button type="button" class="btn-filtro active" data-filtro="Todos">Todos</button>
+            <button type="button" class="btn-filtro" data-filtro="Papel">Papel</button>
+            <button type="button" class="btn-filtro" data-filtro="Tijolo">Tijolo</button>
+            <button type="button" class="btn-filtro" data-filtro="Híbrido">Híbrido</button>
+            <button type="button" class="btn-filtro" data-filtro="FoF">FoF</button>
+            <button type="button" class="btn-filtro" data-filtro="Outros">Outros</button>
+          </div>
+
+          <div class="overflow-x-auto rounded-2xl border border-slate-800">
+            <table class="w-full min-w-[980px] text-sm">
+              <thead class="bg-slate-900/80">
+                <tr class="text-slate-300">
+                  <th class="p-4 text-left font-black uppercase text-[11px] tracking-wider">Ativo</th>
+                  <th class="p-4 text-center font-black uppercase text-[11px] tracking-wider">Preço</th>
+                  <th class="p-4 text-center font-black uppercase text-[11px] tracking-wider">Agenda</th>
+                  <th class="p-4 text-left font-black uppercase text-[11px] tracking-wider">Alocação</th>
+                  <th class="p-4 text-right font-black uppercase text-[11px] tracking-wider">Posição</th>
+                  <th class="p-4 text-center font-black uppercase text-[11px] tracking-wider">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-corpo">
+                <tr>
+                  <td colspan="6" class="p-10 text-center text-slate-500 italic">
+                    Faça login para carregar seus ativos.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <aside class="space-y-6">
+          <div class="card-glass rounded-2xl p-5">
+            <div class="flex items-center justify-between mb-4">
+              <h2 id="form-titulo" class="text-base font-black text-white flex items-center gap-2">
+                <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                Gerenciar Ativo
+              </h2>
+            </div>
+
+            <div class="space-y-3">
+              <input id="ticker-input" type="text" placeholder="Ticker" class="input-base uppercase" />
+              <input id="qtd-input" type="number" min="1" step="1" placeholder="Quantidade" class="input-base" />
+              <input id="pm-input" type="number" min="0" step="0.01" placeholder="Preço médio" class="input-base" />
+              <input id="nota-input" type="number" min="0" max="10" step="1" placeholder="Nota (0 a 10)" class="input-base" />
+              <input id="teto-input" type="number" min="0" step="0.01" placeholder="Preço teto" class="input-base" />
+              <input id="data-com-input" type="number" min="1" max="31" step="1" placeholder="Dia COM" class="input-base" />
+              <input id="data-pg-input" type="number" min="1" max="31" step="1" placeholder="Dia pagamento" class="input-base" />
+
+              <select id="segmento-input" class="input-base">
+                <option value="Papel">Papel</option>
+                <option value="Tijolo">Tijolo</option>
+                <option value="Híbrido">Híbrido</option>
+                <option value="FoF">FoF</option>
+                <option value="Outros">Outros</option>
+              </select>
+
+              <div class="flex gap-2 pt-2">
+                <button id="btn-registrar" type="button" class="btn-primary flex-1">Salvar no Portfólio</button>
+                <button id="btn-cancelar" type="button" class="btn-secondary hidden">Cancelar</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-glass rounded-2xl p-5">
+            <h2 class="text-base font-black text-white mb-4">Indicadores</h2>
+            <div class="space-y-4">
+              <div class="bg-slate-900/60 rounded-2xl p-4 border border-slate-800">
+                <div class="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-1">Stress 5%</div>
+                <div id="queda-pat" class="text-lg font-black text-red-400 val-sensivel">- R$ 0,00</div>
+              </div>
+
+              <div class="bg-slate-900/60 rounded-2xl p-4 border border-slate-800">
+                <div class="text-[11px] uppercase tracking-widest text-slate-400 font-bold mb-2">Sugestões</div>
+                <div id="painel-aportes">
+                  <p class="text-[10px] italic text-slate-600">Sem dados para rebalanceamento.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="secao-proventos" class="hidden">
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div class="xl:col-span-2 card-glass rounded-2xl p-5 min-h-[420px]">
+          <div class="mb-4">
+            <h2 class="text-lg font-black text-white">Histórico de Proventos</h2>
+            <p class="text-slate-400 text-sm">Visualize os rendimentos recebidos por mês.</p>
+          </div>
+
+          <div class="relative h-[320px]">
+            <canvas id="chartProventos"></canvas>
+          </div>
+        </div>
+
+        <div class="card-glass rounded-2xl p-5">
+          <h2 class="text-base font-black text-white mb-4">Registrar Provento</h2>
+
+          <div class="space-y-3">
+            <input id="prov-ticker" type="text" placeholder="Ticker" class="input-base uppercase" />
+            <input id="prov-valor" type="number" min="0" step="0.01" placeholder="Valor recebido" class="input-base" />
+            <input id="prov-data" type="month" class="input-base" />
+            <button id="btn-registrar-provento" type="button" class="btn-primary w-full">Registrar Provento</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="./app.js"></script>
 </body>
 </html>
