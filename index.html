@@ -1,51 +1,61 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FII-INSIGHT PRO TERMINAL</title>
+    <title>FII Insight</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="min-h-screen">
+    <div id="container-notificacoes" class="container-notificacoes"></div>
+
     <nav class="border-b border-slate-800 p-4 glass sticky top-0 z-50 flex justify-between items-center">
         <div class="flex items-center gap-6">
-            <h1 class="text-lg font-black text-emerald-500 italic tracking-tighter uppercase">FII-INSIGHT</h1>
-            <div class="flex gap-4 text-[10px] font-black uppercase tracking-widest text-slate-500" id="abas-nav">
-                <button data-aba="dash" class="tab-active py-2 text-white" type="button">Monitor Alpha</button>
-                <button data-aba="proventos" class="py-2" type="button">Rendimentos</button>
+            <h1 class="text-lg font-black text-emerald-500 italic tracking-tighter uppercase">FII Insight</h1>
+
+            <div class="flex gap-4 text-[10px] font-black uppercase tracking-widest text-slate-500" id="navegacao-abas">
+                <button data-aba="painel" class="aba-ativa py-2 text-white" type="button">Painel</button>
+                <button data-aba="proventos" class="py-2" type="button">Proventos</button>
             </div>
         </div>
+
         <div class="flex items-center gap-4">
-            <button id="btn-ghost" type="button" class="p-2 bg-slate-800 rounded-xl hover:bg-slate-700 transition">
-                <span id="ghost-icon">👁️</span>
+            <button id="botao-modo-privacidade" type="button" class="p-2 bg-slate-800 rounded-xl hover:bg-slate-700 transition">
+                <span id="icone-modo-privacidade">👁️</span>
             </button>
-            <div id="user-info"></div>
+
+            <div id="informacoes-usuario"></div>
         </div>
     </nav>
 
     <main class="p-6 container mx-auto space-y-8">
-        <div id="secao-dash">
+        <section id="secao-painel">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                 <div class="glass p-6 rounded-3xl border-b-4 border-emerald-500">
                     <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest">Patrimônio</p>
-                    <h2 id="total-patrimonio" class="text-2xl font-black mt-2 val-sensivel mono">R$ 0,00</h2>
+                    <h2 id="texto-patrimonio-total" class="text-2xl font-black mt-2 valor-sensivel fonte-monoespacada">R$ 0,00</h2>
                 </div>
+
                 <div class="glass p-6 rounded-3xl border-b-4 border-blue-500">
                     <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest text-nowrap">Projeção Mensal / Hora</p>
                     <div class="flex flex-col mt-2">
-                        <h2 id="renda-mes" class="text-xl font-black text-blue-400 val-sensivel mono">R$ 0,00</h2>
-                        <span id="renda-hora" class="text-[10px] text-blue-300/50 font-bold val-sensivel">R$ 0,00 / hora</span>
+                        <h2 id="texto-renda-mensal" class="text-xl font-black text-blue-400 valor-sensivel fonte-monoespacada">R$ 0,00</h2>
+                        <span id="texto-renda-por-hora" class="text-[10px] text-blue-300/50 font-bold valor-sensivel">R$ 0,00 / hora</span>
                     </div>
                 </div>
+
                 <div class="glass p-6 rounded-3xl border-b-4 border-purple-500">
-                    <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest">Yield On Cost</p>
-                    <h2 id="yoc-medio" class="text-2xl font-black text-purple-400 mt-2 mono">0.00%</h2>
+                    <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest">Yield on Cost</p>
+                    <h2 id="texto-yield-on-cost-medio" class="text-2xl font-black text-purple-400 mt-2 fonte-monoespacada">0.00%</h2>
                 </div>
+
                 <div class="glass p-6 rounded-3xl border-b-4 border-red-500">
-                    <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest">Risco Estresse (5%)</p>
-                    <h2 id="queda-pat" class="text-2xl font-black text-red-500 mt-2 val-sensivel mono">- R$ 0,00</h2>
+                    <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest">Risco em Estresse (5%)</p>
+                    <h2 id="texto-queda-estimada" class="text-2xl font-black text-red-500 mt-2 valor-sensivel fonte-monoespacada">- R$ 0,00</h2>
                 </div>
             </div>
 
@@ -55,88 +65,114 @@
                         <h3 class="text-xs font-black uppercase text-cyan-400 tracking-widest">Alocação por Segmento</h3>
                         <span class="text-[10px] uppercase font-black text-slate-500">Distribuição Atual</span>
                     </div>
+
                     <div class="relative h-[280px]">
-                        <canvas id="chartSegmentos"></canvas>
+                        <canvas id="grafico-alocacao-segmentos"></canvas>
                     </div>
                 </div>
 
                 <div class="glass p-6 rounded-[2rem] border border-white/5">
                     <div class="flex justify-between items-center mb-6">
                         <h3 class="text-xs font-black uppercase text-blue-400 tracking-tighter">Oportunidades de Rebalanceamento</h3>
+
                         <div class="flex items-center gap-2">
                             <span class="text-[9px] text-slate-500 font-black uppercase">Caixa:</span>
-                            <input type="number" id="caixa-disponivel" placeholder="R$ 0,00" class="bg-slate-900 border border-blue-900/30 rounded-lg p-2 text-[10px] text-blue-400 w-28 font-black">
+                            <input
+                                type="number"
+                                id="campo-caixa-disponivel"
+                                placeholder="R$ 0,00"
+                                class="bg-slate-900 border border-blue-900/30 rounded-lg p-2 text-[10px] text-blue-400 w-28 font-black"
+                            >
                         </div>
                     </div>
-                    <div id="painel-aportes" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+
+                    <div id="painel-rebalanceamento" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                 </div>
             </div>
 
-            <div class="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide" id="container-filtros">
-                <button data-filtro="Todos" class="btn-filtro active" type="button">Todos</button>
-                <button data-filtro="Papel" class="btn-filtro" type="button">Papel</button>
-                <button data-filtro="Tijolo" class="btn-filtro" type="button">Tijolo</button>
-                <button data-filtro="Agro" class="btn-filtro" type="button">Agro</button>
-                <button data-filtro="Fundo de Fundo" class="btn-filtro" type="button">FOF</button>
-                <button data-filtro="Outros" class="btn-filtro" type="button">Outros</button>
+            <div class="flex flex-wrap gap-2 mb-6 overflow-x-auto pb-2 esconder-barra-rolagem" id="container-filtros-segmento">
+                <button data-filtro="Todos" class="botao-filtro ativo" type="button">Todos</button>
+                <button data-filtro="Papel" class="botao-filtro" type="button">Papel</button>
+                <button data-filtro="Tijolo" class="botao-filtro" type="button">Tijolo</button>
+                <button data-filtro="Agro" class="botao-filtro" type="button">Agro</button>
+                <button data-filtro="Fundo de Fundo" class="botao-filtro" type="button">Fundo de Fundo</button>
+                <button data-filtro="Outros" class="botao-filtro" type="button">Outros</button>
+            </div>
+
+            <div class="flex flex-wrap gap-2 mb-6" id="container-ordenacao-carteira">
+                <button data-ordenacao="maior-posicao" class="botao-ordenacao ativo" type="button">Maior posição</button>
+                <button data-ordenacao="menor-posicao" class="botao-ordenacao" type="button">Menor posição</button>
+                <button data-ordenacao="ticker" class="botao-ordenacao" type="button">Ticker</button>
+                <button data-ordenacao="nota" class="botao-ordenacao" type="button">Nota</button>
+                <button data-ordenacao="projecao" class="botao-ordenacao" type="button">Projeção</button>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div class="space-y-6">
                     <div class="glass p-8 rounded-[2.5rem] border border-white/5">
-                        <h3 id="form-titulo" class="text-xs font-black uppercase text-emerald-400 mb-6 flex items-center gap-2">
-                            <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Gerenciar Ativo
+                        <h3 id="titulo-formulario-ativo" class="text-xs font-black uppercase text-emerald-400 mb-6 flex items-center gap-2">
+                            <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                            Gerenciar Ativo
                         </h3>
+
                         <div class="space-y-3">
-                            <input type="text" id="ticker-input" placeholder="TICKER" class="input-pro uppercase font-black tracking-widest">
-                            <div id="erro-ticker-input" class="campo-erro hidden"></div>
+                            <input type="text" id="campo-ticker-ativo" placeholder="Ticker" class="campo-formulario uppercase font-black tracking-widest">
+                            <div id="erro-campo-ticker-ativo" class="mensagem-erro-campo hidden"></div>
 
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
-                                    <input type="number" id="qtd-input" placeholder="QTD" class="input-pro text-xs">
-                                    <div id="erro-qtd-input" class="campo-erro hidden"></div>
+                                    <input type="number" id="campo-quantidade-ativo" placeholder="Quantidade" class="campo-formulario text-xs">
+                                    <div id="erro-campo-quantidade-ativo" class="mensagem-erro-campo hidden"></div>
                                 </div>
+
                                 <div>
-                                    <input type="number" id="pm-input" placeholder="P. MÉDIO" class="input-pro text-xs">
-                                    <div id="erro-pm-input" class="campo-erro hidden"></div>
+                                    <input type="number" id="campo-preco-medio-ativo" placeholder="Preço médio" class="campo-formulario text-xs">
+                                    <div id="erro-campo-preco-medio-ativo" class="mensagem-erro-campo hidden"></div>
                                 </div>
                             </div>
 
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
-                                    <input type="number" id="nota-input" placeholder="NOTA (1-10)" class="input-pro text-xs text-blue-400">
-                                    <div id="erro-nota-input" class="campo-erro hidden"></div>
+                                    <input type="number" id="campo-nota-ativo" placeholder="Nota (1 a 10)" class="campo-formulario text-xs text-blue-400">
+                                    <div id="erro-campo-nota-ativo" class="mensagem-erro-campo hidden"></div>
                                 </div>
+
                                 <div>
-                                    <input type="number" id="teto-input" placeholder="P. TETO" class="input-pro text-xs text-emerald-400">
-                                    <div id="erro-teto-input" class="campo-erro hidden"></div>
+                                    <input type="number" id="campo-preco-teto-ativo" placeholder="Preço teto" class="campo-formulario text-xs text-emerald-400">
+                                    <div id="erro-campo-preco-teto-ativo" class="mensagem-erro-campo hidden"></div>
                                 </div>
                             </div>
 
                             <div class="grid grid-cols-2 gap-3 border-t border-slate-800 pt-4 mt-2">
                                 <div class="flex flex-col gap-1">
-                                    <label class="text-[9px] font-black text-slate-500 uppercase ml-1">Dia Data Com</label>
-                                    <input type="number" id="data-com-input" placeholder="EX: 10" class="input-pro text-xs">
-                                    <div id="erro-data-com-input" class="campo-erro hidden"></div>
+                                    <label class="text-[9px] font-black text-slate-500 uppercase ml-1">Dia da Data Com</label>
+                                    <input type="number" id="campo-dia-data-com" placeholder="Ex: 10" class="campo-formulario text-xs">
+                                    <div id="erro-campo-dia-data-com" class="mensagem-erro-campo hidden"></div>
                                 </div>
+
                                 <div class="flex flex-col gap-1">
-                                    <label class="text-[9px] font-black text-slate-500 uppercase ml-1">Dia Pagamento</label>
-                                    <input type="number" id="data-pg-input" placeholder="EX: 15" class="input-pro text-xs">
-                                    <div id="erro-data-pg-input" class="campo-erro hidden"></div>
+                                    <label class="text-[9px] font-black text-slate-500 uppercase ml-1">Dia do Pagamento</label>
+                                    <input type="number" id="campo-dia-pagamento" placeholder="Ex: 15" class="campo-formulario text-xs">
+                                    <div id="erro-campo-dia-pagamento" class="mensagem-erro-campo hidden"></div>
                                 </div>
                             </div>
 
-                            <select id="segmento-input" class="input-pro text-[10px] uppercase font-black text-slate-400">
+                            <select id="campo-segmento-ativo" class="campo-formulario text-[10px] uppercase font-black text-slate-400">
                                 <option value="Papel">Papel (CRI)</option>
                                 <option value="Tijolo">Tijolo</option>
                                 <option value="Agro">Agro</option>
-                                <option value="Fundo de Fundo">FOF</option>
+                                <option value="Fundo de Fundo">Fundo de Fundo</option>
                                 <option value="Outros">Outros</option>
                             </select>
-                            <div id="erro-segmento-input" class="campo-erro hidden"></div>
+                            <div id="erro-campo-segmento-ativo" class="mensagem-erro-campo hidden"></div>
 
-                            <button id="btn-registrar" type="button" class="w-full bg-emerald-600 hover:bg-emerald-500 font-black py-4 rounded-2xl uppercase text-[11px] shadow-lg shadow-emerald-900/20 transition-all mt-4">Salvar no Portfólio</button>
-                            <button id="btn-cancelar" type="button" class="hidden w-full text-slate-500 text-[10px] font-black uppercase mt-2 hover:text-white transition">Cancelar Edição</button>
+                            <button id="botao-salvar-ativo" type="button" class="w-full bg-emerald-600 hover:bg-emerald-500 font-black py-4 rounded-2xl uppercase text-[11px] shadow-lg shadow-emerald-900/20 transition-all mt-4">
+                                Salvar no Portfólio
+                            </button>
+
+                            <button id="botao-cancelar-edicao-ativo" type="button" class="hidden w-full text-slate-500 text-[10px] font-black uppercase mt-2 hover:text-white transition">
+                                Cancelar edição
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -155,30 +191,45 @@
                                         <th class="p-6 text-center">Ações</th>
                                     </tr>
                                 </thead>
-                                <tbody id="tabela-corpo" class="divide-y divide-slate-800/50">
-                                    <tr><td colspan="6" class="p-10 text-center text-slate-500 italic">Faça login para carregar seus ativos.</td></tr>
+                                <tbody id="corpo-tabela-ativos" class="divide-y divide-slate-800/50">
+                                    <tr>
+                                        <td colspan="6" class="p-10 text-center text-slate-500 italic">
+                                            Faça login para carregar seus ativos.
+                                        </td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <div id="secao-proventos" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <section id="secao-proventos" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div class="glass p-8 rounded-[2.5rem] h-fit border-t-4 border-blue-500">
-                <h3 class="text-xs font-black uppercase text-blue-400 mb-6">Lançar Rendimento</h3>
+                <div class="flex items-center justify-between gap-3 mb-6">
+                    <h3 id="titulo-formulario-provento" class="text-xs font-black uppercase text-blue-400">
+                        Lançar Provento
+                    </h3>
+
+                    <button id="botao-cancelar-edicao-provento" type="button" class="hidden text-[10px] font-black uppercase text-slate-400 hover:text-white transition">
+                        Cancelar
+                    </button>
+                </div>
+
                 <div class="space-y-4">
-                    <input type="text" id="prov-ticker" placeholder="TICKER" class="input-pro uppercase font-bold">
-                    <div id="erro-prov-ticker" class="campo-erro hidden"></div>
+                    <input type="text" id="campo-ticker-provento" placeholder="Ticker" class="campo-formulario uppercase font-bold">
+                    <div id="erro-campo-ticker-provento" class="mensagem-erro-campo hidden"></div>
 
-                    <input type="number" id="prov-valor" placeholder="VALOR TOTAL (R$)" class="input-pro font-black text-emerald-400">
-                    <div id="erro-prov-valor" class="campo-erro hidden"></div>
+                    <input type="number" id="campo-valor-provento" placeholder="Valor total (R$)" class="campo-formulario font-black text-emerald-400">
+                    <div id="erro-campo-valor-provento" class="mensagem-erro-campo hidden"></div>
 
-                    <input type="month" id="prov-data" class="input-pro text-slate-400">
-                    <div id="erro-prov-data" class="campo-erro hidden"></div>
+                    <input type="month" id="campo-mes-provento" class="campo-formulario text-slate-400">
+                    <div id="erro-campo-mes-provento" class="mensagem-erro-campo hidden"></div>
 
-                    <button id="btn-registrar-provento" type="button" class="w-full bg-blue-600 hover:bg-blue-500 font-black py-4 rounded-2xl text-xs uppercase shadow-lg shadow-blue-900/20 transition-all">Registrar Provento</button>
+                    <button id="botao-salvar-provento" type="button" class="w-full bg-blue-600 hover:bg-blue-500 font-black py-4 rounded-2xl text-xs uppercase shadow-lg shadow-blue-900/20 transition-all">
+                        Registrar Provento
+                    </button>
                 </div>
             </div>
 
@@ -186,12 +237,13 @@
                 <div class="glass p-8 rounded-[2.5rem] border-t-4 border-purple-500 min-h-[420px]">
                     <div class="flex items-center justify-between mb-6">
                         <div>
-                            <h3 class="text-xs font-black uppercase text-purple-400">Fluxo de Rendimentos</h3>
+                            <h3 class="text-xs font-black uppercase text-purple-400">Fluxo de Proventos</h3>
                             <p class="text-[10px] text-slate-500 uppercase tracking-widest mt-1">Histórico mensal consolidado</p>
                         </div>
                     </div>
+
                     <div class="relative h-[320px]">
-                        <canvas id="chartProventos"></canvas>
+                        <canvas id="grafico-proventos"></canvas>
                     </div>
                 </div>
 
@@ -202,6 +254,7 @@
                             <p class="text-[10px] text-slate-500 uppercase tracking-widest mt-1">Editar e excluir lançamentos</p>
                         </div>
                     </div>
+
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-[11px]">
                             <thead class="bg-slate-900/50">
@@ -212,14 +265,18 @@
                                     <th class="p-4 text-center">Ações</th>
                                 </tr>
                             </thead>
-                            <tbody id="historico-proventos-corpo">
-                                <tr><td colspan="4" class="p-8 text-center text-slate-500 italic">Faça login para ver o histórico.</td></tr>
+                            <tbody id="corpo-tabela-proventos">
+                                <tr>
+                                    <td colspan="4" class="p-8 text-center text-slate-500 italic">
+                                        Faça login para ver o histórico.
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
     </main>
 
     <script type="module" src="app.js"></script>
