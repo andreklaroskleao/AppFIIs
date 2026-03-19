@@ -198,51 +198,35 @@ window.carregarDados = () => {
 window.perguntarIA = async () => {
     const pergunta = document.getElementById('pergunta-ia').value;
     const chat = document.getElementById('chat-ia-respostas');
-    
     if (!pergunta) return;
 
-    const contextoCarteira = dadosAtuaisParaIA.map(a => ({
-        ticker: a.ticker,
-        segmento: a.segmento || 'FII',
-        total: a.total.toFixed(2),
-        abaixoTeto: a.preco <= a.precoTeto
-    }));
+    chat.innerHTML += `<div class='mb-2'>Você: ${pergunta}</div>`;
 
-    chat.innerHTML += `<div class='mb-2 p-2 bg-slate-800/40 rounded-lg text-[10px]'><span class='text-slate-500 font-bold uppercase'>Você:</span> ${pergunta}</div>`;
-    const tempDiv = document.createElement("div");
-    tempDiv.className = "mb-4 p-2 border-l-2 border-purple-500 bg-purple-500/5 text-purple-200 text-[10px]";
-    tempDiv.innerHTML = "<span class='animate-pulse italic'>Alpha IA procurando melhor modelo disponível...</span>";
-    chat.appendChild(tempDiv);
-    chat.scrollTop = chat.scrollHeight;
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{ text: pergunta }]
+                }]
+            })
+        });
 
-    // Lista de modelos para tentar (do mais novo ao mais estável)
-    const modelosParaTentar = ["gemini-1.5-flash"];
-    let sucesso = false;
+        const data = await res.json();
 
-    for (const nomeModelo of modelosParaTentar) {
-        if (sucesso) break;
-        try {
-            const model = genAI.getGenerativeModel({ model: nomeModelo });
-            const promptGeral = `Você é um analista financeiro. Carteira: ${JSON.stringify(contextoCarteira)}. Pergunta: ${pergunta}`;
-            
-            const result = await model.generateContent(promptGeral);
-            const response = result.response;
-            const text = response.text();
-            
-            tempDiv.innerHTML = `<span class='text-purple-400 font-black uppercase'>Alpha IA (${nomeModelo}):</span> ${text}`;
-            sucesso = true;
-        } catch (err) {
-            console.warn(`Falha no modelo ${nomeModelo}:`, err);
-            // Continua para o próximo modelo da lista
-        }
-    }
+        const resposta = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Sem resposta";
 
-    if (!sucesso) {
-        tempDiv.innerHTML = `<span class='text-red-400 font-black uppercase'>Erro Crítico:</span> Nenhum modelo Gemini disponível. Verifique se sua chave de API possui permissão para 'Generative Language API' no Google Cloud Console.`;
+        chat.innerHTML += `<div class='mb-4 text-purple-400'>IA: ${resposta}</div>`;
+
+    } catch (err) {
+        console.error(err);
+        chat.innerHTML += `<div class='text-red-400'>Erro na IA</div>`;
     }
 
     document.getElementById('pergunta-ia').value = "";
-    chat.scrollTop = chat.scrollHeight;
 };
 // --- OPERAÇÕES DE BANCO DE DADOS (CRUD) ---
 window.adicionarFundo = async () => {
