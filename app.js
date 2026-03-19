@@ -281,3 +281,10 @@ window.cancelarEdicao = () => {
 };
 
 window.deletarAtivo = (id) => confirm("Deseja realmente excluir este ativo?") && deleteDoc(doc(db, "ativos", id));
+
+window.testarAPI = async () => {
+  const res = await fetch("https://generativelanguage.googleapis.com/v1/models?key=SUA_API_KEY");
+  const data = await res.json();
+  console.log(data);
+  alert(JSON.stringify(data, null, 2));
+};
