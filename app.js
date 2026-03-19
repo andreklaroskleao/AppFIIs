@@ -1,4 +1,3 @@
-
 import {
     db,
     auth,
@@ -124,7 +123,7 @@ function atualizarEstadoLogin(logado) {
             try {
                 await signOut(auth);
             } catch (erro) {
-                alert(`Erro ao sair: ${erro.message}`);
+                alert(\`Erro ao sair: \${erro.message}\`);
             }
         });
 
@@ -142,7 +141,7 @@ function atualizarEstadoLogin(logado) {
             await setPersistence(auth, browserLocalPersistence);
             await signInWithPopup(auth, provider);
         } catch (erro) {
-            alert(`Erro no login: ${erro.message}`);
+            alert(\`Erro no login: \${erro.message}\`);
         }
     });
 }
@@ -186,10 +185,10 @@ async function fetchBrapiBatch(tickersArray) {
         const simbolos = encodeURIComponent(lote.join(','));
 
         try {
-            const resposta = await fetch(`https://brapi.dev/api/quote/${simbolos}?token=${API_KEY_BRAPI}`);
+            const resposta = await fetch(\`https://brapi.dev/api/quote/\${simbolos}?token=\${API_KEY_BRAPI}\`);
 
             if (!resposta.ok) {
-                throw new Error(`HTTP ${resposta.status}`);
+                throw new Error(\`HTTP \${resposta.status}\`);
             }
 
             const data = await resposta.json();
@@ -664,6 +663,7 @@ onAuthStateChanged(auth, (user) => {
 
     if (user) {
         usuarioAtual = user;
+        resetarDashboard();
         atualizarEstadoLogin(true);
         assinarAtivos();
         assinarProventos();
