@@ -1,26 +1,26 @@
 import { db, auth, provider, signInWithPopup, signOut } from './firebase-config.js';
-import { collection, addDoc, query, where, onSnapshot, doc, deleteDoc, updateDoc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, addDoc, query, where, onSnapshot, doc, deleteDoc, updateDoc, getDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const API_KEY = "hshuPrGV3kvLM6Yh8FEDrD";
 let usuarioAtual = null;
 let idEdicaoAtiva = null;
+let chartProventos = null;
 
-// --- AUTH ---
 auth.onAuthStateChanged(user => {
     const info = document.getElementById('user-info');
     if (user) {
         usuarioAtual = user;
-        info.innerHTML = `<div class='flex items-center gap-3'><img src='${user.photoURL}' class='w-8 h-8 rounded-full border border-emerald-500'><button onclick='window.fazerLogout()' class='text-[9px] font-black uppercase text-red-500'>Sair</button></div>`;
+        info.innerHTML = `<button onclick="window.fazerLogout()" class="text-[9px] font-black text-red-500 uppercase">Sair</button>`;
         carregarDados();
     } else {
         usuarioAtual = null;
-        info.innerHTML = `<button onclick='window.fazerLogin()' class='bg-emerald-600 px-6 py-2 rounded-full font-black text-[10px] uppercase'>Entrar</button>`;
+        info.innerHTML = `<button onclick="window.fazerLogin()" class="bg-emerald-600 px-4 py-2 rounded-full font-black text-[10px] uppercase">Entrar</button>`;
     }
 });
+
 window.fazerLogin = () => signInWithPopup(auth, provider);
 window.fazerLogout = () => signOut(auth);
 
-// --- BUSCA API ---
 async function fetchBrapi(ticker) {
     try {
         const res = await fetch(`https://brapi.dev/api/quote/${ticker.trim().toUpperCase()}?token=${API_KEY}`);
@@ -29,7 +29,14 @@ async function fetchBrapi(ticker) {
     } catch { return null; }
 }
 
-// --- CORE: CARREGAR DADOS ---
+window.mudarAba = (aba) => {
+    document.getElementById('secao-dash').classList.toggle('hidden', aba !== 'dash');
+    document.getElementById('secao-proventos').classList.toggle('hidden', aba !== 'proventos');
+    document.getElementById('tab-dash').classList.toggle('tab-active', aba === 'dash');
+    document.getElementById('tab-proventos').classList.toggle('tab-active', aba === 'proventos');
+    if(aba === 'proventos') carregarGraficoProventos();
+};
+
 window.carregarDados = () => {
     if (!usuarioAtual) return;
     const q = query(collection(db, "ativos"), where("uid", "==", usuarioAtual.uid));
@@ -54,30 +61,25 @@ window.carregarDados = () => {
             const pReal = patTotal > 0 ? (f.total / patTotal) : 0;
             const teto = f.precoTeto || 0;
             
-            if ((pReal < pIdeal) && (f.preco <= teto || teto === 0)) {
+            if (pReal < pIdeal && (f.preco <= teto || teto === 0)) {
                 sug.push({ ticker: f.ticker, qtd: Math.floor((patGlobal * pIdeal - f.total) / f.preco), nota: f.nota });
             }
 
             html += `
-                <tr class="hover:bg-slate-800/30 transition">
-                    <td class="p-4 font-black text-emerald-400">${f.ticker} <span class="block text-[8px] text-slate-600">${f.segmento}</span></td>
-                    <td class="p-4 text-xs">
+                <tr class="hover:bg-slate-800/30">
+                    <td data-label="Ativo" class="p-4 font-black text-emerald-400">${f.ticker} <span class="block text-[8px] text-slate-600">${f.segmento}</span></td>
+                    <td data-label="Preço/Teto" class="p-4 text-xs">
                         <div class="text-white font-bold">R$ ${f.preco.toFixed(2)}</div>
-                        <div class="text-[9px] text-slate-500 italic">TETO: R$ ${teto.toFixed(2)}</div>
+                        <div class="text-[9px] text-slate-500">Teto: R$ ${teto.toFixed(2)}</div>
                     </td>
-                    <td class="p-4">
-                        <div class="flex justify-between text-[8px] font-black text-slate-500 mb-1">
-                            <span>ALVO: ${(pIdeal*100).toFixed(1)}%</span>
-                            <span>REAL: ${(pReal*100).toFixed(1)}%</span>
-                        </div>
+                    <td data-label="Peso" class="p-4">
                         <div class="w-full bg-slate-900 h-1 rounded-full"><div class="bg-blue-600 h-full" style="width:${(pReal*100)}%"></div></div>
+                        <span class="text-[8px] text-slate-500 uppercase mt-1">Real: ${(pReal*100).toFixed(1)}% / Alvo: ${(pIdeal*100).toFixed(1)}%</span>
                     </td>
-                    <td class="p-4 text-right font-black text-xs">R$ ${f.total.toFixed(2)}</td>
-                    <td class="p-4">
-                        <div class="flex gap-3 justify-center">
-                            <button onclick="window.prepararEdicao('${f.id}')" class="text-blue-500 hover:underline font-bold text-[9px] uppercase">Editar</button>
-                            <button onclick="window.deletarAtivo('${f.id}')" class="text-slate-700 hover:text-red-500">✕</button>
-                        </div>
+                    <td data-label="Total" class="p-4 text-right font-black text-xs">R$ ${f.total.toFixed(2)}</td>
+                    <td class="p-4 flex gap-2 justify-center">
+                        <button onclick="window.prepararEdicao('${f.id}')" class="text-blue-500 text-[9px] uppercase font-bold">Editar</button>
+                        <button onclick="window.deletarAtivo('${f.id}')" class="text-slate-700 hover:text-red-500">✕</button>
                     </td>
                 </tr>`;
         });
@@ -89,41 +91,12 @@ window.carregarDados = () => {
         document.getElementById('queda-pat').innerText = `- R$ ${(patTotal*0.12).toLocaleString('pt-BR')}`;
 
         document.getElementById('painel-aportes').innerHTML = sug.sort((a,b)=>b.nota-a.nota).slice(0,2).map(s => `
-            <div class="bg-slate-900/40 p-3 rounded-xl border border-slate-800">
-                <div class="text-[8px] text-slate-500 font-black mb-1">COMPRA SUGERIDA</div>
-                <div class="text-lg font-black text-white">${s.ticker} <span class="text-emerald-500">${s.qtd} un.</span></div>
+            <div class="bg-slate-900/60 p-4 rounded-2xl border border-blue-900/20">
+                <div class="text-[8px] text-slate-500 font-black mb-1">REBALANCEAR</div>
+                <div class="text-base font-black text-white">${s.ticker} <span class="text-emerald-500">+${s.qtd} un.</span></div>
             </div>
-        `).join('') || '<p class="text-slate-600 text-xs italic">Carteira equilibrada.</p>';
+        `).join('') || '<p class="text-slate-600 text-[10px] italic">Carteira em equilíbrio ou ativos caros.</p>';
     });
-}
-
-// --- SISTEMA DE EDIÇÃO ---
-window.prepararEdicao = async (id) => {
-    const d = await getDoc(doc(db, "ativos", id));
-    if (d.exists()) {
-        const i = d.data();
-        document.getElementById('ticker-input').value = i.ticker;
-        document.getElementById('qtd-input').value = i.quantidade;
-        document.getElementById('pm-input').value = i.precoMedio;
-        document.getElementById('nota-input').value = i.nota;
-        document.getElementById('teto-input').value = i.precoTeto;
-        document.getElementById('segmento-input').value = i.segmento;
-        document.getElementById('data-compra-input').value = i.dataCompra || "";
-        
-        idEdicaoAtiva = id;
-        document.getElementById('form-titulo').innerText = "Editando Ativo";
-        document.getElementById('btn-registrar').innerText = "Salvar Alterações";
-        document.getElementById('btn-cancelar').classList.remove('hidden');
-        window.scrollTo(0,0);
-    }
-};
-
-window.cancelarEdicao = () => {
-    idEdicaoAtiva = null;
-    document.getElementById('form-titulo').innerText = "Novo Aporte";
-    document.getElementById('btn-registrar').innerText = "Registrar Ativo";
-    document.getElementById('btn-cancelar').classList.add('hidden');
-    ['ticker-input', 'qtd-input', 'pm-input', 'nota-input', 'teto-input', 'data-compra-input'].forEach(i => document.getElementById(i).value = '');
 };
 
 window.adicionarFundo = async () => {
@@ -147,21 +120,70 @@ window.adicionarFundo = async () => {
     }
 };
 
-// --- CHAT IA ---
+window.prepararEdicao = async (id) => {
+    const d = await getDoc(doc(db, "ativos", id));
+    if (d.exists()) {
+        const i = d.data();
+        document.getElementById('ticker-input').value = i.ticker;
+        document.getElementById('qtd-input').value = i.quantidade;
+        document.getElementById('pm-input').value = i.precoMedio;
+        document.getElementById('nota-input').value = i.nota;
+        document.getElementById('teto-input').value = i.precoTeto;
+        document.getElementById('segmento-input').value = i.segmento;
+        document.getElementById('data-compra-input').value = i.dataCompra || "";
+        idEdicaoAtiva = id;
+        document.getElementById('form-titulo').innerText = "Editar Ativo";
+        document.getElementById('btn-registrar').innerText = "Salvar Alteração";
+        document.getElementById('btn-cancelar').classList.remove('hidden');
+    }
+};
+
+window.cancelarEdicao = () => {
+    idEdicaoAtiva = null;
+    document.getElementById('form-titulo').innerText = "Novo Ativo";
+    document.getElementById('btn-registrar').innerText = "Salvar Ativo";
+    document.getElementById('btn-cancelar').classList.add('hidden');
+    ['ticker-input', 'qtd-input', 'pm-input', 'nota-input', 'teto-input', 'data-compra-input'].forEach(i => document.getElementById(i).value = '');
+};
+
 window.perguntarIA = () => {
     const p = document.getElementById('pergunta-ia').value.toLowerCase();
     const chat = document.getElementById('chat-ia-respostas');
-    let r = "";
-
-    if (p.includes("risco")) r = "Seu maior risco é o setor de Papel, que sofre com a deflação. Diversifique em Tijolo.";
-    else if (p.includes("comprar")) r = "O painel de aportes sugere focar nos ativos com maior 'gap' entre peso real e alvo.";
-    else if (p.includes("setor")) r = "Atualmente, o setor de Logística apresenta as melhores barreiras de entrada.";
-    else r = "Como analista, recomendo manter aportes constantes e nunca exceder 15% em um único ativo.";
-
-    chat.innerHTML += `<div class='mb-2'><strong>Você:</strong> ${document.getElementById('pergunta-ia').value}</div>`;
-    chat.innerHTML += `<div class='mb-2 text-purple-300'><strong>IA:</strong> ${r}</div>`;
+    let r = "Sugiro focar no rebalanceamento via aportes recomendados.";
+    if (p.includes("risco")) r = "Atenção à exposição em FIIs de Papel caso a inflação caia.";
+    else if (p.includes("setor")) r = "O setor de Logística está com vacância baixa no momento.";
+    chat.innerHTML += `<div class='mb-1 text-white'><strong>P:</strong> ${p}</div><div class='mb-3 text-purple-300'><strong>R:</strong> ${r}</div>`;
     document.getElementById('pergunta-ia').value = "";
     chat.scrollTop = chat.scrollHeight;
 };
+
+window.registrarProvento = async () => {
+    const payload = {
+        uid: usuarioAtual.uid,
+        ticker: document.getElementById('prov-ticker').value.toUpperCase(),
+        valor: parseFloat(document.getElementById('prov-valor').value),
+        dataRef: document.getElementById('prov-data').value,
+        timestamp: serverTimestamp()
+    };
+    if(payload.ticker && payload.valor) {
+        await addDoc(collection(db, "proventos"), payload);
+        alert("Salvo!");
+        carregarGraficoProventos();
+    }
+};
+
+async function carregarGraficoProventos() {
+    const q = query(collection(db, "proventos"), where("uid", "==", usuarioAtual.uid));
+    const snap = await getDocs(q);
+    const dados = {};
+    snap.forEach(d => { const p = d.data(); dados[p.dataRef] = (dados[p.dataRef] || 0) + p.valor; });
+    const labels = Object.keys(dados).sort();
+    if (chartProventos) chartProventos.destroy();
+    chartProventos = new Chart(document.getElementById('chartProventos'), {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'R$ Mensal', data: labels.map(l => dados[l]), backgroundColor: '#10b981' }] },
+        options: { responsive: true, maintainAspectRatio: false }
+    });
+}
 
 window.deletarAtivo = (id) => confirm("Excluir?") && deleteDoc(doc(db, "ativos", id));
