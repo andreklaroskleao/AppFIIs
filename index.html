@@ -3,113 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FII-Insight Ultra | v12.0</title>
+    <title>FII-Insight Ultra</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <style>
         body { background-color: #020617; color: #f1f5f9; font-family: 'Inter', sans-serif; }
         .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
         .tab-active { border-bottom: 3px solid #10b981; color: #10b981; font-weight: 900; }
-        .font-mono { font-family: 'JetBrains Mono', monospace; }
-        input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     </style>
 </head>
-<body class="min-h-screen pb-10">
-
-    <nav class="border-b border-slate-800 p-4 sticky top-0 z-50 glass flex justify-between items-center">
+<body class="min-h-screen pb-20">
+    <nav class="border-b border-slate-800 p-4 glass flex justify-between items-center sticky top-0 z-50">
         <div class="flex items-center gap-6">
-            <h1 class="text-xl font-black text-emerald-400 italic tracking-tighter">FII-INSIGHT <span class="text-white text-[10px] bg-emerald-600 px-1 rounded not-italic">V12</span></h1>
-            <div class="hidden md:flex gap-6 text-[11px] font-bold uppercase tracking-widest text-slate-500">
-                <button onclick="window.mudarAba('dash')" id="tab-dash" class="tab-active py-2 transition-colors hover:text-white">Monitor</button>
-                <button onclick="window.mudarAba('simulador')" id="tab-simulador" class="py-2 transition-colors hover:text-white">Simulador</button>
-                <button onclick="window.mudarAba('ir')" id="tab-ir" class="py-2 transition-colors hover:text-white">Relatório I.R.</button>
+            <h1 class="text-xl font-black text-emerald-400 italic tracking-tighter">FII-INSIGHT</h1>
+            <div class="flex gap-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                <button onclick="window.mudarAba('dash')" id="tab-dash" class="tab-active py-2">Monitor</button>
+                <button onclick="window.mudarAba('proventos')" id="tab-proventos" class="py-2">Proventos</button>
+                <button onclick="window.mudarAba('simulador')" id="tab-simulador" class="py-2">Simulador</button>
             </div>
         </div>
-        <div id="user-info" class="flex items-center gap-3"></div>
+        <div id="user-info"></div>
     </nav>
 
-    <main class="container mx-auto p-4 lg:p-6">
-        
+    <main class="p-6 container mx-auto">
         <div id="secao-dash">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                <div class="glass p-5 rounded-2xl border-l-2 border-slate-700">
+                <div class="glass p-5 rounded-2xl">
                     <p class="text-slate-500 text-[10px] font-bold uppercase">Patrimônio Atual</p>
-                    <h2 id="total-patrimonio" class="text-2xl font-black font-mono">R$ 0,00</h2>
+                    <h2 id="total-patrimonio" class="text-2xl font-black">R$ 0,00</h2>
                 </div>
-                <div class="glass p-5 rounded-2xl border-l-2 border-blue-500">
-                    <p class="text-slate-500 text-[10px] font-bold uppercase">P/VP Médio</p>
-                    <h2 id="pvp-medio" class="text-2xl font-black text-blue-400 font-mono">0.00</h2>
+                <div class="glass p-5 rounded-2xl">
+                    <p class="text-slate-500 text-[10px] font-bold uppercase">Renda Mensal Est.</p>
+                    <h2 id="total-dividendos" class="text-2xl font-black text-emerald-400">R$ 0,00</h2>
                 </div>
-                <div class="glass p-5 rounded-2xl border-l-2 border-emerald-500">
-                    <p class="text-slate-500 text-[10px] font-bold uppercase">Renda Mensal Est. (0.85%)</p>
-                    <h2 id="total-dividendos" class="text-2xl font-black text-emerald-400 font-mono">R$ 0,00</h2>
+                <div class="glass p-5 rounded-2xl">
+                    <p class="text-slate-500 text-[10px] font-bold uppercase">Lucro/Prejuízo Total</p>
+                    <h2 id="lucro-total" class="text-2xl font-black text-blue-400">R$ 0,00</h2>
                 </div>
-                <div class="glass p-5 rounded-2xl border-l-2 border-orange-500">
-                    <p class="text-slate-500 text-[10px] font-bold uppercase">Resultado (Lucro/Prejuízo)</p>
-                    <h2 id="lucro-total" class="text-2xl font-black font-mono text-orange-400">R$ 0,00</h2>
+                <div class="glass p-5 rounded-2xl">
+                    <p class="text-slate-500 text-[10px] font-bold uppercase">Total de Ativos</p>
+                    <h2 id="qtd-ativos" class="text-2xl font-black text-slate-300">0</h2>
                 </div>
             </div>
 
-            <div class="lg:col-span-1 glass p-6 rounded-2xl h-fit">
-                                <h3 class="text-xs font-black uppercase text-emerald-400 mb-4 tracking-widest">Novo Aporte / Ativo</h3>
-                                <input type="text" id="ticker-input" placeholder="TICKER" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-2 uppercase font-bold text-white">
-                                <div class="grid grid-cols-2 gap-2 mb-2">
-                                    <input type="number" id="qtd-input" placeholder="QTD" class="bg-slate-900 border border-slate-700 rounded p-3">
-                                    <input type="number" id="pm-input" placeholder="P. MÉDIO" class="bg-slate-900 border border-slate-700 rounded p-3">
-                                </div>
-                                <div class="grid grid-cols-2 gap-2 mb-4">
-                                    <input type="number" id="nota-input" placeholder="NOTA (1-10)" class="bg-slate-900 border border-slate-700 rounded p-3">
-                                    <input type="number" id="teto-input" placeholder="P. TETO" class="bg-slate-900 border border-slate-700 rounded p-3">
-                                </div>
-                                <button onclick="window.adicionarFundo()" class="w-full bg-emerald-600 hover:bg-emerald-500 font-bold py-3 rounded uppercase text-xs transition-all shadow-lg shadow-emerald-900/20">Registrar Ativo</button>
-                                <div class="mt-6 h-48"><canvas id="chartDistribuicao"></canvas></div>
-                            </div>
-                            
-                            <thead class="bg-slate-900 text-slate-400 uppercase text-[9px] tracking-widest">
-                                <tr>
-                                    <th class="p-4">Ativo</th>
-                                    <th class="p-4">Preço / Teto</th>
-                                    <th class="p-4">Nota</th>
-                                    <th class="p-4">Ideal vs Atual</th>
-                                    <th class="p-4">Qtd</th>
-                                    <th class="p-4">Total</th>
-                                    <th class="p-4 text-center">Status</th>
-                                    <th class="p-4">Ação</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tabela-corpo" class="divide-y divide-slate-800/50">
-                                </tbody>
-                        </table>
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <div class="lg:col-span-1 space-y-6">
+                    <div class="glass p-6 rounded-2xl">
+                        <h3 class="text-xs font-black uppercase text-emerald-400 mb-4">Novo Aporte</h3>
+                        <input type="text" id="ticker-input" placeholder="TICKER" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-2 uppercase font-bold">
+                        <div class="grid grid-cols-2 gap-2 mb-2">
+                            <input type="number" id="qtd-input" placeholder="QTD" class="bg-slate-900 border border-slate-700 rounded p-3 text-sm">
+                            <input type="number" id="pm-input" placeholder="P. MÉDIO" class="bg-slate-900 border border-slate-700 rounded p-3 text-sm">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mb-4">
+                            <input type="number" id="nota-input" placeholder="NOTA (1-10)" class="bg-slate-900 border border-slate-700 rounded p-3 text-sm text-blue-400">
+                            <input type="number" id="teto-input" placeholder="P. TETO" class="bg-slate-900 border border-slate-700 rounded p-3 text-sm text-emerald-400">
+                        </div>
+                        <button onclick="window.adicionarFundo()" class="w-full bg-emerald-600 font-bold py-3 rounded uppercase text-xs mb-2">Registrar</button>
+                        <button onclick="window.exportarParaExcel()" class="w-full bg-slate-800 text-slate-400 font-bold py-2 rounded uppercase text-[10px] border border-slate-700">📥 Exportar Excel</button>
                     </div>
+
+                    <div class="glass p-5 rounded-2xl text-center">
+                        <p class="text-[9px] font-black text-slate-500 uppercase mb-3">Sentimento do Mercado (P/Teto)</p>
+                        <div class="relative h-3 w-full bg-gradient-to-r from-red-500 via-yellow-500 to-emerald-500 rounded-full">
+                            <div id="ponteiro-sentimento" class="absolute top-0 w-1 h-full bg-white shadow-lg transition-all duration-1000" style="left: 50%"></div>
+                        </div>
+                        <h4 id="status-sentimento" class="text-[10px] font-black mt-3 text-white uppercase italic tracking-widest">Analisando...</h4>
+                    </div>
+
+                    <div class="glass p-6 rounded-2xl h-48"><canvas id="chartDistribuicao"></canvas></div>
+                </div>
+
+                <div class="lg:col-span-3 glass rounded-2xl overflow-hidden h-fit">
+                    <table class="w-full text-left text-[11px]">
+                        <thead class="bg-slate-900/50 text-slate-500 uppercase font-black">
+                            <tr>
+                                <th class="p-4">Ativo</th>
+                                <th class="p-4">Preço / Teto</th>
+                                <th class="p-4">Ideal vs Atual</th>
+                                <th class="p-4 text-center">Info</th>
+                                <th class="p-4">Total</th>
+                                <th class="p-4 text-center">Recomendação</th>
+                                <th class="p-4 text-center">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-corpo"></tbody>
+                    </table>
                 </div>
             </div>
         </div>
 
-        <div id="secao-simulador" class="hidden">
-            <div class="max-w-4xl mx-auto glass p-8 rounded-3xl border-t-4 border-blue-500">
-                <h2 class="text-2xl font-black text-blue-400 mb-2 uppercase tracking-tighter">Projetor de Renda Passiva</h2>
-                <p class="text-slate-400 text-sm mb-8">Defina sua meta mensal e descubra o caminho para a independência financeira.</p>
-                
-                <div class="flex gap-4 mb-10">
-                    <input type="number" id="meta-renda" placeholder="Meta Mensal (Ex: 5000)" class="flex-1 bg-slate-900 border-2 border-slate-700 rounded-xl p-4 text-2xl font-black text-white outline-none focus:border-blue-500 font-mono">
-                    <button onclick="window.calcularSimulacao()" class="bg-blue-600 hover:bg-blue-500 text-white font-black px-8 rounded-xl transition-all uppercase text-sm tracking-widest">Calcular</button>
+        <div id="secao-proventos" class="hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="glass p-6 rounded-2xl h-fit">
+                    <h3 class="text-xs font-black uppercase text-blue-400 mb-4">Registrar Recebimento</h3>
+                    <input type="text" id="prov-ticker" placeholder="TICKER" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-2 uppercase font-bold">
+                    <input type="number" id="prov-valor" placeholder="VALOR TOTAL (R$)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-2 font-black text-emerald-400">
+                    <input type="month" id="prov-data" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-4 text-slate-400">
+                    <button onclick="window.registrarProvento()" class="w-full bg-blue-600 font-bold py-3 rounded uppercase text-xs">Lançar Dividendos</button>
                 </div>
-
-                <div id="resultado-simulacao" class="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-0 transition-opacity duration-500">
-                    </div>
+                <div class="lg:col-span-2 glass p-6 rounded-2xl min-h-[400px]">
+                    <canvas id="chartProventos"></canvas>
+                </div>
             </div>
         </div>
-
-        <div id="secao-ir" class="hidden">
-            <div class="glass p-8 rounded-3xl border-t-4 border-emerald-500 max-w-5xl mx-auto">
-                <h2 class="text-2xl font-black text-emerald-400 mb-2 uppercase tracking-tighter">Declaração de Bens e Direitos</h2>
-                <p class="text-slate-400 text-sm mb-8">Copie as descrições abaixo para o programa da Receita Federal.</p>
-                <div id="lista-ir" class="space-y-4">
-                    </div>
-            </div>
-        </div>
-
     </main>
 
     <script type="module" src="app.js"></script>
