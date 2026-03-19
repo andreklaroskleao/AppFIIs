@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
 
 // --- CONFIGURAÇÕES ---
 const API_KEY_BRAPI = "hshuPrGV3kvLM6Yh8FEDrD";
-const GEMINI_API_KEY = "AIzaSyDrEtdPXFXydgQcb5LEiyS9re7S3PhzUw8";
+const GEMINI_API_KEY = "AIzaSyDV3PHVBEeawB6h_uBYwxMtrKHBA0Tyl2M";
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
