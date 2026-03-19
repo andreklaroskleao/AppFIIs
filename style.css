@@ -78,3 +78,50 @@ td {
 }
 
 .tab-active { border-bottom: 2px solid var(--emerald); color: var(--emerald); font-weight: 900; }
+
+/* Adicione ao seu style.css existente */
+
+.input-pro {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.input-pro:focus { border-color: #10b981; }
+
+.btn-filtro {
+    background: #0f172a;
+    color: #64748b;
+    padding: 0.5rem 1.25rem;
+    border-radius: 99px;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    white-space: nowrap;
+    border: 1px solid #1e293b;
+}
+.btn-filtro.active {
+    background: #10b981;
+    color: #020617;
+    border-color: #10b981;
+}
+
+/* Efeito Ghost */
+.ghost-mode .val-sensivel {
+    filter: blur(5px);
+    pointer-events: none;
+    user-select: none;
+}
+
+.badge-com {
+    background: #1e293b;
+    color: #3b82f6;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 8px;
+    font-weight: 900;
+    margin-left: 5px;
+    border: 1px solid rgba(59,130,246,0.3);
+}
