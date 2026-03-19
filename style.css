@@ -1,64 +1,104 @@
-/* Tooltip Container */
-.tooltip-container {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    cursor: help;
+/* Configurações Gerais */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;900&display=swap');
+
+:root {
+    --bg-dark: #020617;
+    --glass: rgba(15, 23, 42, 0.7);
+    --emerald: #10b981;
+    --blue: #3b82f6;
+    --purple: #a855f7;
+    --slate-500: #64748b;
 }
 
-/* O Balão de Texto */
+body { 
+    background-color: var(--bg-dark); 
+    color: #f1f5f9; 
+    font-family: 'Inter', sans-serif; 
+    -webkit-tap-highlight-color: transparent; 
+}
+
+.glass { 
+    background: var(--glass); 
+    backdrop-filter: blur(16px); 
+    border: 1px solid rgba(255,255,255,0.05); 
+}
+
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+.tab-active { 
+    border-bottom: 2px solid var(--emerald); 
+    color: var(--emerald); 
+    font-weight: 900; 
+}
+
+/* TOOLTIPS PREMIUM */
+.tooltip-container { 
+    position: relative; 
+    display: inline-flex; 
+    align-items: center; 
+    cursor: help; 
+}
+
 .tooltip-content {
-    visibility: hidden;
-    position: absolute;
-    bottom: 125%; /* Aparece acima do ícone */
-    left: 50%;
+    visibility: hidden; 
+    position: absolute; 
+    bottom: 130%; 
+    left: 50%; 
     transform: translateX(-50%);
-    background-color: #1e293b; /* Slate 800 */
-    color: #f1f5f9;
-    text-align: center;
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 1.4;
-    width: 180px;
-    z-index: 100;
-    opacity: 0;
-    transition: opacity 0.3s, visibility 0.3s;
-    border: 1px solid rgba(255,255,255,0.1);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
-    pointer-events: none; /* Não atrapalha o clique */
+    background: #1e293b; 
+    color: #f1f5f9; 
+    padding: 10px; 
+    border-radius: 10px;
+    font-size: 10px; 
+    width: 180px; 
+    z-index: 100; 
+    opacity: 0; 
+    transition: all 0.2s ease;
+    border: 1px solid rgba(255,255,255,0.1); 
+    box-shadow: 0 10px 20px rgba(0,0,0,0.4); 
+    pointer-events: none;
 }
 
-/* Seta do Balão */
-.tooltip-content::after {
-    content: "";
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    margin-left: -5px;
-    border-width: 5px;
-    border-style: solid;
-    border-color: #1e293b transparent transparent transparent;
+.tooltip-content::after { 
+    content: ""; 
+    position: absolute; 
+    top: 100%; 
+    left: 50%; 
+    margin-left: -5px; 
+    border: 5px solid; 
+    border-color: #1e293b transparent transparent transparent; 
 }
 
-/* Mostrar ao passar o mouse ou focar (Desktop) */
-.tooltip-container:hover .tooltip-content,
-.tooltip-container:focus .tooltip-content {
-    visibility: visible;
-    opacity: 1;
+.tooltip-container:hover .tooltip-content, 
+.tooltip-container:focus .tooltip-content { 
+    visibility: visible; 
+    opacity: 1; 
 }
 
-/* Ajuste para telas pequenas (Mobile) */
-@media (max-width: 640px) {
-    .tooltip-content {
-        width: 140px;
-        left: auto;
-        right: 0;
-        transform: translateX(0);
+/* TABELA RESPONSIVA (Mobile First) */
+@media (max-width: 768px) {
+    table, thead, tbody, th, td, tr { display: block; }
+    thead { display: none; }
+    tr { 
+        margin-bottom: 1rem; 
+        border: 1px solid rgba(255,255,255,0.05); 
+        border-radius: 1rem; 
+        background: rgba(15, 23, 42, 0.4); 
+        padding: 1rem; 
     }
-    .tooltip-content::after {
-        left: auto;
-        right: 10px;
+    td { 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        border: none !important; 
+        padding: 0.5rem 0 !important; 
+        border-bottom: 1px solid rgba(255,255,255,0.03) !important; 
+    }
+    td::before { 
+        content: attr(data-label); 
+        font-size: 9px; 
+        font-weight: 900; 
+        color: var(--slate-500); 
+        text-transform: uppercase; 
     }
 }
