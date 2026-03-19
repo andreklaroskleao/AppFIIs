@@ -36,6 +36,7 @@ let instanciaGraficoProventos = null;
 let instanciaGraficoSegmentos = null;
 let listaAtivosEmMemoria = [];
 let listaProventosEmMemoria = [];
+let mapaLinhasExpandidas = {};
 let cancelarInscricaoAtivos = null;
 let cancelarInscricaoProventos = null;
 
@@ -71,7 +72,8 @@ const camposFormularioAtivo = {
     precoTeto: document.getElementById('campo-preco-teto-ativo'),
     diaDataCom: document.getElementById('campo-dia-data-com'),
     diaPagamento: document.getElementById('campo-dia-pagamento'),
-    segmento: document.getElementById('campo-segmento-ativo')
+    segmento: document.getElementById('campo-segmento-ativo'),
+    observacao: document.getElementById('campo-observacao-ativo')
 };
 
 const camposFormularioProvento = {
@@ -301,6 +303,7 @@ function cancelarInscricoesAtivas() {
 function resetarPainel() {
     listaAtivosEmMemoria = [];
     listaProventosEmMemoria = [];
+    mapaLinhasExpandidas = {};
 
     elementosInterface.textoPatrimonioTotal.textContent = 'R$ 0,00';
     elementosInterface.textoRendaMensal.textContent = 'R$ 0,00';
@@ -308,7 +311,7 @@ function resetarPainel() {
     elementosInterface.textoYieldOnCostMedio.textContent = '0.00%';
     elementosInterface.textoQuedaEstimada.textContent = '- R$ 0,00';
     elementosInterface.painelRebalanceamento.innerHTML = '<p class="text-[10px] italic p-4 text-slate-600">Sem dados para rebalanceamento.</p>';
-    elementosInterface.corpoTabelaAtivos.innerHTML = '<tr><td colspan="6" class="p-10 text-center text-slate-500 italic">Faça login para carregar seus ativos.</td></tr>';
+    elementosInterface.corpoTabelaAtivos.innerHTML = '<tr><td colspan="7" class="p-10 text-center text-slate-500 italic">Faça login para carregar seus ativos.</td></tr>';
     elementosInterface.corpoTabelaProventos.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-slate-500 italic">Faça login para ver o histórico.</td></tr>';
 
     if (instanciaGraficoProventos) {
@@ -380,6 +383,17 @@ function enriquecerListaAtivos(listaAtivosOriginal, mapaCotacoes) {
             ? (precoAtual * (dividendYieldAnual / 100)) / 12
             : precoAtual * 0.008;
 
+        const valorTotalAtual = precoAtual * quantidade;
+        const valorTotalInvestido = precoMedio * quantidade;
+        const lucroPrejuizoValor = valorTotalAtual - valorTotalInvestido;
+        const lucroPrejuizoPercentual = valorTotalInvestido > 0 ? (lucroPrejuizoValor / valorTotalInvestido) * 100 : 0;
+        const rendaMensalEstimada = quantidade * dividendoMensalEstimadoPorCota;
+        const rendaAnualEstimada = rendaMensalEstimada * 12;
+        const diferencaParaPrecoTetoValor = converterParaNumeroSeguro(ativoOriginal.precoTeto, 0) - precoAtual;
+        const diferencaParaPrecoTetoPercentual = precoAtual > 0
+            ? ((converterParaNumeroSeguro(ativoOriginal.precoTeto, 0) - precoAtual) / precoAtual) * 100
+            : 0;
+
         return {
             id: ativoOriginal.id,
             uid: ativoOriginal.uid,
@@ -391,10 +405,17 @@ function enriquecerListaAtivos(listaAtivosOriginal, mapaCotacoes) {
             diaDataCom: validarDiaDoMes(ativoOriginal.diaDataCom),
             diaPagamento: validarDiaDoMes(ativoOriginal.diaPagamento),
             segmento: LISTA_SEGMENTOS_VALIDOS.includes(ativoOriginal.segmento) ? ativoOriginal.segmento : 'Outros',
+            observacao: ativoOriginal.observacao || '',
             precoAtual,
             dividendoMensalEstimadoPorCota,
-            valorTotalAtual: precoAtual * quantidade,
-            valorTotalInvestido: precoMedio * quantidade
+            valorTotalAtual,
+            valorTotalInvestido,
+            lucroPrejuizoValor,
+            lucroPrejuizoPercentual,
+            rendaMensalEstimada,
+            rendaAnualEstimada,
+            diferencaParaPrecoTetoValor,
+            diferencaParaPrecoTetoPercentual
         };
     });
 }
@@ -562,11 +583,7 @@ function obterListaAtivosFiltradaEOrdenada() {
             listaProcessada.sort((ativoA, ativoB) => ativoB.nota - ativoA.nota);
             break;
         case 'projecao':
-            listaProcessada.sort((ativoA, ativoB) => {
-                const projecaoA = ativoA.quantidade * ativoA.dividendoMensalEstimadoPorCota;
-                const projecaoB = ativoB.quantidade * ativoB.dividendoMensalEstimadoPorCota;
-                return projecaoB - projecaoA;
-            });
+            listaProcessada.sort((ativoA, ativoB) => ativoB.rendaMensalEstimada - ativoA.rendaMensalEstimada);
             break;
         case 'maior-posicao':
         default:
@@ -577,6 +594,267 @@ function obterListaAtivosFiltradaEOrdenada() {
     return listaProcessada;
 }
 
+function obterClasseResultadoValor(valor) {
+    if (valor > 0) return 'valor-positivo';
+    if (valor < 0) return 'valor-negativo';
+    return '';
+}
+
+function obterStatusAtivo(ativo, pesoReal, pesoIdeal) {
+    const estaAbaixoDoTeto = ativo.precoAtual <= ativo.precoTeto && ativo.precoAtual > 0;
+    const pesoMuitoAbaixoDoIdeal = pesoIdeal > 0 && pesoReal < (pesoIdeal * 0.65);
+    const diaAtual = new Date().getDate();
+    const dataComProxima = ativo.diaDataCom ? calcularDistanciaCircularEntreDias(ativo.diaDataCom, diaAtual) <= 3 : false;
+
+    if (ativo.precoAtual > ativo.precoTeto && ativo.precoTeto > 0) {
+        return { rotulo: 'Acima do teto', classe: 'acima-teto' };
+    }
+
+    if (estaAbaixoDoTeto && pesoMuitoAbaixoDoIdeal && ativo.nota >= 7) {
+        return { rotulo: 'Oportunidade', classe: 'oportunidade' };
+    }
+
+    if (dataComProxima) {
+        return { rotulo: 'Data próxima', classe: 'data-proxima' };
+    }
+
+    if (pesoMuitoAbaixoDoIdeal) {
+        return { rotulo: 'Peso baixo', classe: 'peso-baixo' };
+    }
+
+    return { rotulo: 'Neutro', classe: 'neutro' };
+}
+
+function calcularScoreAtivo(ativo, pesoReal, pesoIdeal) {
+    let score = 0;
+
+    score += Math.min(ativo.nota, 10) * 0.4;
+
+    if (ativo.precoAtual > 0 && ativo.precoTeto > 0) {
+        if (ativo.precoAtual <= ativo.precoTeto) {
+            score += Math.min(2.5, Math.max(0, ativo.diferencaParaPrecoTetoPercentual / 5));
+        } else {
+            score -= 1.5;
+        }
+    }
+
+    if (pesoIdeal > 0 && pesoReal < pesoIdeal) {
+        score += Math.min(2.0, ((pesoIdeal - pesoReal) / pesoIdeal) * 2);
+    }
+
+    if (ativo.rendaMensalEstimada > 0) {
+        score += Math.min(1.5, ativo.rendaMensalEstimada / 5);
+    }
+
+    const diaAtual = new Date().getDate();
+    const dataComProxima = ativo.diaDataCom ? calcularDistanciaCircularEntreDias(ativo.diaDataCom, diaAtual) <= 3 : false;
+    if (dataComProxima) {
+        score += 0.6;
+    }
+
+    return Math.max(0, Math.min(10, score));
+}
+
+function obterListaProventosPorTicker(ticker) {
+    return listaProventosEmMemoria
+        .filter((provento) => provento.ticker === ticker)
+        .sort((proventoA, proventoB) => proventoB.mesAno.localeCompare(proventoA.mesAno))
+        .slice(0, 6);
+}
+
+function montarResumoSimulacaoAporte(ativo, valorAporte, patrimonioTotalCarteira) {
+    if (!Number.isFinite(valorAporte) || valorAporte <= 0 || ativo.precoAtual <= 0) {
+        return null;
+    }
+
+    const quantidadeCompravel = Math.floor(valorAporte / ativo.precoAtual);
+    if (quantidadeCompravel <= 0) {
+        return {
+            quantidadeCompravel: 0,
+            novoValorPosicao: ativo.valorTotalAtual,
+            novoPeso: patrimonioTotalCarteira > 0 ? (ativo.valorTotalAtual / (patrimonioTotalCarteira + valorAporte)) * 100 : 0,
+            aumentoRendaMensal: 0
+        };
+    }
+
+    const novoValorPosicao = ativo.valorTotalAtual + (quantidadeCompravel * ativo.precoAtual);
+    const novoPatrimonioTotal = patrimonioTotalCarteira + valorAporte;
+    const novoPeso = novoPatrimonioTotal > 0 ? (novoValorPosicao / novoPatrimonioTotal) * 100 : 0;
+    const aumentoRendaMensal = quantidadeCompravel * ativo.dividendoMensalEstimadoPorCota;
+
+    return {
+        quantidadeCompravel,
+        novoValorPosicao,
+        novoPeso,
+        aumentoRendaMensal
+    };
+}
+
+function renderizarDetalhesDoAtivo(ativo, pesoReal, pesoIdeal, patrimonioTotalCarteira) {
+    const listaProventosTicker = obterListaProventosPorTicker(ativo.ticker);
+    const scoreAtivo = calcularScoreAtivo(ativo, pesoReal, pesoIdeal);
+    const valorSimuladoAporte = ativo.valorSimulacaoAporte || 0;
+    const resultadoSimulacao = montarResumoSimulacaoAporte(ativo, valorSimuladoAporte, patrimonioTotalCarteira);
+    const percentualParticipacaoNaRendaTotal = listaAtivosEmMemoria.reduce((soma, item) => soma + item.rendaMensalEstimada, 0) > 0
+        ? (ativo.rendaMensalEstimada / listaAtivosEmMemoria.reduce((soma, item) => soma + item.rendaMensalEstimada, 0)) * 100
+        : 0;
+
+    return `
+        <tr class="linha-expandida">
+            <td colspan="7" class="p-4 !pt-0">
+                <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mt-2">
+                    <div class="space-y-4">
+                        <div class="cartao-detalhes-ativo">
+                            <div class="titulo-cartao-detalhes">Resumo financeiro</div>
+                            <div class="grid grid-cols-2 gap-3 text-[11px]">
+                                <div>
+                                    <div class="text-slate-500 uppercase font-black mb-1">Custo total</div>
+                                    <div class="valor-destaque-detalhes valor-sensivel">R$ ${formatarMoeda(ativo.valorTotalInvestido)}</div>
+                                </div>
+                                <div>
+                                    <div class="text-slate-500 uppercase font-black mb-1">Valor atual</div>
+                                    <div class="valor-destaque-detalhes valor-sensivel">R$ ${formatarMoeda(ativo.valorTotalAtual)}</div>
+                                </div>
+                                <div>
+                                    <div class="text-slate-500 uppercase font-black mb-1">Resultado</div>
+                                    <div class="valor-destaque-detalhes valor-sensivel ${obterClasseResultadoValor(ativo.lucroPrejuizoValor)}">${ativo.lucroPrejuizoValor >= 0 ? '+' : '-'} R$ ${formatarMoeda(Math.abs(ativo.lucroPrejuizoValor))}</div>
+                                </div>
+                                <div>
+                                    <div class="text-slate-500 uppercase font-black mb-1">Retorno</div>
+                                    <div class="valor-destaque-detalhes ${obterClasseResultadoValor(ativo.lucroPrejuizoPercentual)}">${ativo.lucroPrejuizoPercentual >= 0 ? '+' : ''}${ativo.lucroPrejuizoPercentual.toFixed(2)}%</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="cartao-detalhes-ativo">
+                            <div class="titulo-cartao-detalhes">Valuation</div>
+                            <div class="grid grid-cols-2 gap-3 text-[11px]">
+                                <div>
+                                    <div class="text-slate-500 uppercase font-black mb-1">Preço médio</div>
+                                    <div class="valor-destaque-detalhes valor-sensivel">R$ ${formatarMoeda(ativo.precoMedio)}</div>
+                                </div>
+                                <div>
+                                    <div class="text-slate-500 uppercase font-black mb-1">Preço teto</div>
+                                    <div class="valor-destaque-detalhes valor-sensivel">R$ ${formatarMoeda(ativo.precoTeto)}</div>
+                                </div>
+                                <div>
+                                    <div class="text-slate-500 uppercase font-black mb-1">Diferença até teto</div>
+                                    <div class="valor-destaque-detalhes ${obterClasseResultadoValor(ativo.diferencaParaPrecoTetoPercentual)}">${ativo.diferencaParaPrecoTetoPercentual >= 0 ? '+' : ''}${ativo.diferencaParaPrecoTetoPercentual.toFixed(2)}%</div>
+                                </div>
+                                <div>
+                                    <div class="text-slate-500 uppercase font-black mb-1">Score</div>
+                                    <div class="valor-destaque-detalhes text-blue-400">${scoreAtivo.toFixed(1)} / 10</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="cartao-detalhes-ativo">
+                            <div class="titulo-cartao-detalhes">Renda e alocação</div>
+                            <div class="grid grid-cols-2 gap-3 text-[11px] mb-4">
+                                <div>
+                                    <div class="text-slate-500 uppercase font-black mb-1">Mensal estimada</div>
+                                    <div class="valor-destaque-detalhes text-emerald-400 valor-sensivel">R$ ${formatarMoeda(ativo.rendaMensalEstimada)}</div>
+                                </div>
+                                <div>
+                                    <div class="text-slate-500 uppercase font-black mb-1">Anual estimada</div>
+                                    <div class="valor-destaque-detalhes text-emerald-400 valor-sensivel">R$ ${formatarMoeda(ativo.rendaAnualEstimada)}</div>
+                                </div>
+                                <div>
+                                    <div class="text-slate-500 uppercase font-black mb-1">Peso real</div>
+                                    <div class="valor-destaque-detalhes text-blue-400">${(pesoReal * 100).toFixed(2)}%</div>
+                                </div>
+                                <div>
+                                    <div class="text-slate-500 uppercase font-black mb-1">Peso alvo</div>
+                                    <div class="valor-destaque-detalhes text-amber-400">${(pesoIdeal * 100).toFixed(2)}%</div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="flex items-center justify-between text-[10px] font-black uppercase text-slate-500 mb-2">
+                                    <span>Real</span>
+                                    <span>Alvo</span>
+                                </div>
+                                <div class="barra-alocacao-container">
+                                    <div class="barra-alocacao-real" style="width:${Math.min(100, Math.max(0, pesoReal * 100))}%"></div>
+                                    <div class="marcador-alocacao-alvo" style="left:calc(${Math.min(100, Math.max(0, pesoIdeal * 100))}% - 1px)"></div>
+                                </div>
+                            </div>
+
+                            <div class="text-[11px] text-slate-300">
+                                Participação na renda total da carteira: <span class="font-black text-purple-300">${percentualParticipacaoNaRendaTotal.toFixed(2)}%</span>
+                            </div>
+                        </div>
+
+                        <div class="cartao-detalhes-ativo">
+                            <div class="titulo-cartao-detalhes">Simulador de aporte</div>
+                            <div class="space-y-3">
+                                <input
+                                    type="number"
+                                    class="campo-simulacao campo-simulacao-aporte"
+                                    data-id="${escaparHtml(ativo.id)}"
+                                    value="${valorSimuladoAporte || ''}"
+                                    placeholder="Informe o valor do aporte"
+                                >
+                                ${
+                                    resultadoSimulacao
+                                        ? `
+                                            <div class="grid grid-cols-2 gap-3 text-[11px]">
+                                                <div>
+                                                    <div class="text-slate-500 uppercase font-black mb-1">Cotas compráveis</div>
+                                                    <div class="valor-destaque-detalhes">${resultadoSimulacao.quantidadeCompravel}</div>
+                                                </div>
+                                                <div>
+                                                    <div class="text-slate-500 uppercase font-black mb-1">Novo peso</div>
+                                                    <div class="valor-destaque-detalhes text-blue-400">${resultadoSimulacao.novoPeso.toFixed(2)}%</div>
+                                                </div>
+                                                <div>
+                                                    <div class="text-slate-500 uppercase font-black mb-1">Nova posição</div>
+                                                    <div class="valor-destaque-detalhes valor-sensivel">R$ ${formatarMoeda(resultadoSimulacao.novoValorPosicao)}</div>
+                                                </div>
+                                                <div>
+                                                    <div class="text-slate-500 uppercase font-black mb-1">Aumento mensal</div>
+                                                    <div class="valor-destaque-detalhes text-emerald-400 valor-sensivel">R$ ${formatarMoeda(resultadoSimulacao.aumentoRendaMensal)}</div>
+                                                </div>
+                                            </div>
+                                        `
+                                        : '<div class="text-[11px] text-slate-400">Digite um valor para simular o impacto do aporte.</div>'
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="cartao-detalhes-ativo">
+                            <div class="titulo-cartao-detalhes">Últimos proventos do ticker</div>
+                            ${
+                                listaProventosTicker.length
+                                    ? `
+                                        <div class="space-y-2">
+                                            ${listaProventosTicker.map((provento) => `
+                                                <div class="flex items-center justify-between text-[11px] border-b border-white/5 pb-2">
+                                                    <span class="text-slate-300">${formatarMesAno(provento.mesAno)}</span>
+                                                    <span class="font-black text-emerald-400 valor-sensivel">R$ ${formatarMoeda(provento.valor)}</span>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    `
+                                    : '<div class="text-[11px] text-slate-400">Ainda não há proventos cadastrados para este ticker.</div>'
+                            }
+                        </div>
+
+                        <div class="cartao-detalhes-ativo">
+                            <div class="titulo-cartao-detalhes">Observações</div>
+                            <div class="area-observacao-detalhes">${escaparHtml(ativo.observacao || 'Sem observações cadastradas.')}</div>
+                        </div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    `;
+}
+
 function renderizarTabelaAtivos() {
     const listaAtivosFiltradaEOrdenada = obterListaAtivosFiltradaEOrdenada();
     const caixaDisponivel = converterParaNumeroSeguro(elementosInterface.campoCaixaDisponivel.value, 0);
@@ -584,24 +862,23 @@ function renderizarTabelaAtivos() {
 
     let patrimonioTotal = 0;
     let somaDasNotas = 0;
-    let valorTotalInvestido = 0;
+    let valorTotalInvestidoCarteira = 0;
     let projecaoMensalTotal = 0;
     const listaSugestoesRebalanceamento = [];
 
     listaAtivosFiltradaEOrdenada.forEach((ativo) => {
         patrimonioTotal += ativo.valorTotalAtual;
         somaDasNotas += ativo.nota;
-        valorTotalInvestido += ativo.valorTotalInvestido;
+        valorTotalInvestidoCarteira += ativo.valorTotalInvestido;
+        projecaoMensalTotal += ativo.rendaMensalEstimada;
     });
 
-    const linhasTabela = listaAtivosFiltradaEOrdenada.map((ativo) => {
+    const htmlLinhas = listaAtivosFiltradaEOrdenada.map((ativo) => {
         const pesoIdeal = somaDasNotas > 0 ? ativo.nota / somaDasNotas : 0;
         const pesoReal = patrimonioTotal > 0 ? ativo.valorTotalAtual / patrimonioTotal : 0;
-        const rendimentoMensalEstimado = ativo.quantidade * ativo.dividendoMensalEstimadoPorCota;
         const larguraBarra = Math.max(0, Math.min(100, pesoReal * 100));
         const dataComProxima = ativo.diaDataCom ? calcularDistanciaCircularEntreDias(ativo.diaDataCom, diaAtual) <= 3 : false;
-
-        projecaoMensalTotal += rendimentoMensalEstimado;
+        const statusAtivo = obterStatusAtivo(ativo, pesoReal, pesoIdeal);
 
         if (pesoReal < pesoIdeal && ativo.precoAtual > 0 && ativo.precoAtual <= (ativo.precoTeto || Number.POSITIVE_INFINITY)) {
             const quantidadeSugerida = Math.floor((((patrimonioTotal + caixaDisponivel) * pesoIdeal) - ativo.valorTotalAtual) / ativo.precoAtual);
@@ -614,40 +891,52 @@ function renderizarTabelaAtivos() {
             }
         }
 
-        const classeTextoPrecoTeto = (ativo.precoAtual || 0) > (ativo.precoTeto || 0) ? 'text-red-500' : 'text-emerald-500';
+        const classeResultado = obterClasseResultadoValor(ativo.lucroPrejuizoValor);
+        const classePrecoTeto = ativo.precoAtual > ativo.precoTeto ? 'text-red-500' : 'text-emerald-500';
         const htmlPrecoAtual = ativo.precoAtual > 0
             ? `R$ ${formatarMoeda(ativo.precoAtual)}`
             : '<span class="text-red-500 text-[10px]">API OFF</span>';
 
-        return `
+        const htmlLinhaPrincipal = `
             <tr>
                 <td class="p-4">
-                    <div class="flex flex-col">
-                        <div class="flex items-center gap-2">
+                    <div class="flex flex-col gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
                             <span class="font-black text-emerald-400 text-sm tracking-tighter">${escaparHtml(ativo.ticker)}</span>
+                            <span class="selo-status ${statusAtivo.classe}">${statusAtivo.rotulo}</span>
                             ${dataComProxima ? '<span class="indicador-data-com">DATA COM</span>' : ''}
                         </div>
                         <span class="text-[9px] text-slate-500 uppercase font-black">${escaparHtml(ativo.segmento)}</span>
+                        <span class="text-[9px] text-slate-400 uppercase font-black">Nota ${ativo.nota}</span>
+                    </div>
+                </td>
+
+                <td class="p-4">
+                    <div class="flex flex-col gap-2">
+                        <div>
+                            <div class="text-[8px] text-slate-500 font-bold uppercase">Atual</div>
+                            <div class="font-bold text-white text-xs valor-sensivel">${htmlPrecoAtual}</div>
+                        </div>
+                        <div class="text-[10px] text-slate-400">
+                            Médio: <span class="font-black valor-sensivel">R$ ${formatarMoeda(ativo.precoMedio)}</span>
+                        </div>
+                        <div class="text-[10px] ${classePrecoTeto} font-black">
+                            Teto: R$ ${formatarMoeda(ativo.precoTeto)}
+                        </div>
+                        <div class="text-[10px] ${obterClasseResultadoValor(ativo.diferencaParaPrecoTetoPercentual)} font-black">
+                            ${ativo.diferencaParaPrecoTetoPercentual >= 0 ? '+' : ''}${ativo.diferencaParaPrecoTetoPercentual.toFixed(2)}% até o teto
+                        </div>
                     </div>
                 </td>
 
                 <td class="p-4 text-center">
-                    <div class="flex flex-col">
-                        <span class="text-[8px] text-slate-500 font-bold uppercase">Preço / Teto</span>
-                        <span class="font-bold text-white text-xs valor-sensivel">${htmlPrecoAtual}</span>
-                        <span class="text-[10px] ${classeTextoPrecoTeto} font-black">Teto: R$ ${formatarMoeda(ativo.precoTeto)}</span>
-                    </div>
-                </td>
-
-                <td class="p-4 text-center">
-                    <div class="flex flex-col items-center">
-                        <span class="text-[8px] text-slate-500 font-bold uppercase mb-1">Agenda</span>
+                    <div class="flex flex-col items-center gap-2">
                         <div class="flex gap-2">
-                            <div class="bg-slate-900 px-2 py-1 rounded border border-white/5 min-w-[35px]">
+                            <div class="bg-slate-900 px-2 py-1 rounded border border-white/5 min-w-[42px]">
                                 <span class="text-[7px] text-blue-400 font-black block text-center">COM</span>
                                 <span class="text-white text-[10px] font-bold block text-center">${ativo.diaDataCom == null ? '--' : ativo.diaDataCom}</span>
                             </div>
-                            <div class="bg-slate-900 px-2 py-1 rounded border border-white/5 min-w-[35px]">
+                            <div class="bg-slate-900 px-2 py-1 rounded border border-white/5 min-w-[42px]">
                                 <span class="text-[7px] text-emerald-400 font-black block text-center">PAGO</span>
                                 <span class="text-white text-[10px] font-bold block text-center">${ativo.diaPagamento == null ? '--' : ativo.diaPagamento}</span>
                             </div>
@@ -656,40 +945,73 @@ function renderizarTabelaAtivos() {
                 </td>
 
                 <td class="p-4">
-                    <div class="w-full min-w-[150px]">
-                        <div class="flex justify-between text-[8px] font-black text-slate-500 mb-1 uppercase gap-3">
-                            <span class="text-blue-400">${(pesoReal * 100).toFixed(1)}% Real / ${(pesoIdeal * 100).toFixed(1)}% Alvo</span>
-                            <span class="text-purple-400">R$ ${formatarMoeda(rendimentoMensalEstimado)} Est.</span>
+                    <div class="flex flex-col gap-2">
+                        <div class="text-[10px] text-slate-400">
+                            Mensal: <span class="font-black text-emerald-400 valor-sensivel">R$ ${formatarMoeda(ativo.rendaMensalEstimada)}</span>
                         </div>
-                        <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-white/5">
-                            <div class="bg-blue-600 h-full" style="width:${larguraBarra}%"></div>
+                        <div class="text-[10px] text-slate-400">
+                            Anual: <span class="font-black text-emerald-400 valor-sensivel">R$ ${formatarMoeda(ativo.rendaAnualEstimada)}</span>
+                        </div>
+                        <div class="text-[10px] text-slate-400">
+                            Yield estimado: <span class="font-black text-purple-300">${ativo.precoAtual > 0 ? ((ativo.dividendoMensalEstimadoPorCota * 12 / ativo.precoAtual) * 100).toFixed(2) : '0.00'}%</span>
                         </div>
                     </div>
                 </td>
 
-                <td class="p-4 text-right">
-                    <div class="flex flex-col items-end">
-                        <span class="font-black text-white text-sm fonte-monoespacada valor-sensivel">R$ ${formatarMoeda(ativo.valorTotalAtual)}</span>
-                        <span class="text-[9px] text-slate-500 font-bold uppercase">${formatarMoeda(ativo.quantidade, 0)} cotas</span>
+                <td class="p-4">
+                    <div class="flex flex-col gap-2">
+                        <div class="text-[10px] text-slate-400">
+                            Quantidade: <span class="font-black text-white">${formatarMoeda(ativo.quantidade, 0)}</span>
+                        </div>
+                        <div class="text-[10px] text-slate-400">
+                            Custo: <span class="font-black valor-sensivel">R$ ${formatarMoeda(ativo.valorTotalInvestido)}</span>
+                        </div>
+                        <div class="text-[10px] text-slate-400">
+                            Atual: <span class="font-black valor-sensivel">R$ ${formatarMoeda(ativo.valorTotalAtual)}</span>
+                        </div>
+                        <div class="text-[10px] ${classeResultado} font-black">
+                            ${ativo.lucroPrejuizoValor >= 0 ? '+' : '-'} R$ ${formatarMoeda(Math.abs(ativo.lucroPrejuizoValor))} (${ativo.lucroPrejuizoPercentual >= 0 ? '+' : ''}${ativo.lucroPrejuizoPercentual.toFixed(2)}%)
+                        </div>
+                    </div>
+                </td>
+
+                <td class="p-4">
+                    <div class="w-full min-w-[150px]">
+                        <div class="flex justify-between text-[8px] font-black text-slate-500 mb-1 uppercase gap-3">
+                            <span class="text-blue-400">${(pesoReal * 100).toFixed(1)}% real</span>
+                            <span class="text-amber-400">${(pesoIdeal * 100).toFixed(1)}% alvo</span>
+                        </div>
+                        <div class="barra-alocacao-container">
+                            <div class="barra-alocacao-real" style="width:${larguraBarra}%"></div>
+                            <div class="marcador-alocacao-alvo" style="left:calc(${Math.min(100, Math.max(0, pesoIdeal * 100))}% - 1px)"></div>
+                        </div>
                     </div>
                 </td>
 
                 <td class="p-4 text-center">
-                    <div class="flex gap-2 justify-center">
+                    <div class="flex gap-2 justify-center flex-wrap">
                         <button data-id="${escaparHtml(ativo.id)}" type="button" class="botao-acao-tabela botao-editar-ativo hover:text-blue-400" aria-label="Editar ativo">📝</button>
                         <button data-id="${escaparHtml(ativo.id)}" type="button" class="botao-acao-tabela botao-excluir-ativo hover:text-red-500" aria-label="Excluir ativo">✕</button>
+                        <button data-ticker="${escaparHtml(ativo.ticker)}" type="button" class="botao-acao-tabela botao-registrar-provento hover:text-emerald-400" aria-label="Registrar provento">💸</button>
+                        <button data-id="${escaparHtml(ativo.id)}" type="button" class="botao-acao-tabela botao-detalhes-ativo hover:text-purple-400" aria-label="Detalhes do ativo">${mapaLinhasExpandidas[ativo.id] ? '▴' : '▾'}</button>
                     </div>
                 </td>
             </tr>
         `;
+
+        const htmlLinhaDetalhes = mapaLinhasExpandidas[ativo.id]
+            ? renderizarDetalhesDoAtivo(ativo, pesoReal, pesoIdeal, patrimonioTotal)
+            : '';
+
+        return htmlLinhaPrincipal + htmlLinhaDetalhes;
     }).join('');
 
-    elementosInterface.corpoTabelaAtivos.innerHTML = linhasTabela || '<tr><td colspan="6" class="p-10 text-center text-slate-500 italic">Nenhum ativo corresponde aos filtros.</td></tr>';
+    elementosInterface.corpoTabelaAtivos.innerHTML = htmlLinhas || '<tr><td colspan="7" class="p-10 text-center text-slate-500 italic">Nenhum ativo corresponde aos filtros.</td></tr>';
     elementosInterface.textoPatrimonioTotal.textContent = `R$ ${formatarMoeda(patrimonioTotal)}`;
     elementosInterface.textoRendaMensal.textContent = `R$ ${formatarMoeda(projecaoMensalTotal)}`;
     elementosInterface.textoRendaPorHora.textContent = `R$ ${formatarMoeda(projecaoMensalTotal / 720, 4)} / hora`;
-    elementosInterface.textoYieldOnCostMedio.textContent = valorTotalInvestido > 0
-        ? `${((projecaoMensalTotal * 12 / valorTotalInvestido) * 100).toFixed(2)}%`
+    elementosInterface.textoYieldOnCostMedio.textContent = valorTotalInvestidoCarteira > 0
+        ? `${((projecaoMensalTotal * 12 / valorTotalInvestidoCarteira) * 100).toFixed(2)}%`
         : '0.00%';
     elementosInterface.textoQuedaEstimada.textContent = `- R$ ${formatarMoeda(patrimonioTotal * 0.05)} (Stress 5%)`;
 
@@ -730,7 +1052,7 @@ function assinarColecaoAtivos() {
         renderizarTabelaAtivos();
     }, (erro) => {
         console.error('Erro ao escutar ativos:', erro);
-        elementosInterface.corpoTabelaAtivos.innerHTML = '<tr><td colspan="6" class="p-10 text-center text-red-500 italic">Erro ao carregar ativos.</td></tr>';
+        elementosInterface.corpoTabelaAtivos.innerHTML = '<tr><td colspan="7" class="p-10 text-center text-red-500 italic">Erro ao carregar ativos.</td></tr>';
         mostrarNotificacao('Erro ao carregar os ativos.', 'erro');
     });
 }
@@ -768,6 +1090,7 @@ function assinarColecaoProventos() {
         );
 
         renderizarHistoricoProventos();
+        renderizarTabelaAtivos();
     }, (erro) => {
         console.error('Erro ao escutar proventos:', erro);
         mostrarNotificacao('Erro ao carregar os proventos.', 'erro');
@@ -788,6 +1111,7 @@ function cancelarEdicaoAtivo() {
     camposFormularioAtivo.diaDataCom.value = '';
     camposFormularioAtivo.diaPagamento.value = '';
     camposFormularioAtivo.segmento.value = 'Papel';
+    camposFormularioAtivo.observacao.value = '';
 
     limparErrosFormularioAtivo();
 }
@@ -838,6 +1162,7 @@ async function prepararEdicaoAtivo(identificadorAtivo) {
         camposFormularioAtivo.diaDataCom.value = dadosAtivo.diaDataCom || '';
         camposFormularioAtivo.diaPagamento.value = dadosAtivo.diaPagamento || '';
         camposFormularioAtivo.segmento.value = dadosAtivo.segmento || 'Outros';
+        camposFormularioAtivo.observacao.value = dadosAtivo.observacao || '';
 
         identificadorAtivoEmEdicao = identificadorAtivo;
         elementosInterface.botaoSalvarAtivo.textContent = 'Atualizar Ativo';
@@ -866,6 +1191,7 @@ async function salvarAtivo() {
         diaDataCom: validarDiaDoMes(camposFormularioAtivo.diaDataCom.value),
         diaPagamento: validarDiaDoMes(camposFormularioAtivo.diaPagamento.value),
         segmento: camposFormularioAtivo.segmento.value || 'Outros',
+        observacao: camposFormularioAtivo.observacao.value || '',
         timestamp: serverTimestamp()
     };
 
@@ -934,6 +1260,13 @@ async function salvarProvento() {
     }
 }
 
+function abrirFormularioProventoComTickerPreenchido(ticker) {
+    document.querySelector('[data-aba="proventos"]').click();
+    camposFormularioProvento.ticker.value = ticker;
+    camposFormularioProvento.valor.focus();
+    mostrarNotificacao(`Ticker ${ticker} enviado para o formulário de proventos.`, 'info');
+}
+
 function inicializarEventosDaInterface() {
     document.getElementById('botao-modo-privacidade').addEventListener('click', () => {
         modoPrivacidadeAtivo = !modoPrivacidadeAtivo;
@@ -997,6 +1330,8 @@ function inicializarEventosDaInterface() {
     elementosInterface.corpoTabelaAtivos.addEventListener('click', async (evento) => {
         const botaoEditarAtivo = evento.target.closest('.botao-editar-ativo');
         const botaoExcluirAtivo = evento.target.closest('.botao-excluir-ativo');
+        const botaoDetalhesAtivo = evento.target.closest('.botao-detalhes-ativo');
+        const botaoRegistrarProvento = evento.target.closest('.botao-registrar-provento');
 
         if (botaoEditarAtivo) {
             await prepararEdicaoAtivo(botaoEditarAtivo.dataset.id);
@@ -1020,6 +1355,32 @@ function inicializarEventosDaInterface() {
                 mostrarNotificacao(`Erro ao excluir ativo: ${erro.message}`, 'erro');
             }
         }
+
+        if (botaoDetalhesAtivo) {
+            const identificadorAtivo = botaoDetalhesAtivo.dataset.id;
+            mapaLinhasExpandidas[identificadorAtivo] = !mapaLinhasExpandidas[identificadorAtivo];
+            renderizarTabelaAtivos();
+        }
+
+        if (botaoRegistrarProvento) {
+            abrirFormularioProventoComTickerPreenchido(botaoRegistrarProvento.dataset.ticker);
+        }
+    });
+
+    elementosInterface.corpoTabelaAtivos.addEventListener('input', (evento) => {
+        const campoSimulacaoAporte = evento.target.closest('.campo-simulacao-aporte');
+        if (!campoSimulacaoAporte) {
+            return;
+        }
+
+        const identificadorAtivo = campoSimulacaoAporte.dataset.id;
+        const ativo = listaAtivosEmMemoria.find((item) => item.id === identificadorAtivo);
+        if (!ativo) {
+            return;
+        }
+
+        ativo.valorSimulacaoAporte = converterParaNumeroSeguro(campoSimulacaoAporte.value, 0);
+        renderizarTabelaAtivos();
     });
 
     elementosInterface.corpoTabelaProventos.addEventListener('click', async (evento) => {
