@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FII-Insight | Meu Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-900 text-white min-h-screen">
+
+    <nav class="border-b border-slate-800 p-4 bg-slate-900 sticky top-0 z-10">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold text-emerald-400">FII-Insight 📊</h1>
+            <div id="user-info" class="text-sm text-slate-400">Carregando...</div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto p-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+                <p class="text-slate-400 text-sm">Patrimônio Total</p>
+                <h2 id="total-patrimonio" class="text-3xl font-bold">R$ 0,00</h2>
+            </div>
+            <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+                <p class="text-slate-400 text-sm">Dividendos Estimados (Mês)</p>
+                <h2 id="total-dividendos" class="text-3xl font-bold text-emerald-400">R$ 0,00</h2>
+            </div>
+            <div class="bg-slate-800 p-6 rounded-xl border border-slate-700">
+                <p class="text-slate-400 text-sm">Magic Number Médio</p>
+                <h2 id="magic-number" class="text-3xl font-bold text-blue-400">--</h2>
+            </div>
+        </div>
+
+        <section class="bg-slate-800 p-6 rounded-xl mb-8 border border-slate-700">
+            <h3 class="text-lg font-semibold mb-4 text-slate-200">Adicionar FII à Carteira</h3>
+            <div class="flex flex-wrap gap-4">
+                <input type="text" id="ticker-input" placeholder="Ex: HGLG11" class="bg-slate-700 border-none rounded-lg p-3 text-white focus:ring-2 focus:ring-emerald-500 flex-1">
+                <input type="number" id="qtd-input" placeholder="Quantidade" class="bg-slate-700 border-none rounded-lg p-3 text-white focus:ring-2 focus:ring-emerald-500 w-32">
+                <input type="number" id="pm-input" placeholder="Preço Médio" class="bg-slate-700 border-none rounded-lg p-3 text-white focus:ring-2 focus:ring-emerald-500 w-32">
+                <button onclick="adicionarFundo()" class="bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-bold py-3 px-6 rounded-lg transition-all">
+                    Adicionar
+                </button>
+            </div>
+        </section>
+
+        <div class="overflow-x-auto bg-slate-800 rounded-xl border border-slate-700">
+            <table class="w-full text-left">
+                <thead class="bg-slate-700 text-slate-300 uppercase text-xs">
+                    <tr>
+                        <th class="p-4">Ticker</th>
+                        <th class="p-4">Preço Atual</th>
+                        <th class="p-4">P/VP</th>
+                        <th class="p-4">Qtd</th>
+                        <th class="p-4">Total</th>
+                        <th class="p-4">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="tabela-corpo" class="divide-y divide-slate-700">
+                    </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
